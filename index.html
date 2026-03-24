@@ -1,0 +1,2160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Financial Taskflow</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Noto+Sans+Lao:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans','Noto Sans Lao',sans-serif;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:#f1f5f9;}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:99px;}
+input:focus,select:focus,textarea:focus{border-color:#3b82f6!important;box-shadow:0 0 0 3px rgba(59,130,246,0.12)!important;outline:none!important;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%,75%{transform:translateX(-7px)}50%{transform:translateX(7px)}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.spin{animation:spin 0.8s linear infinite;display:inline-block;}
+button{cursor:pointer;font-family:'DM Sans','Noto Sans Lao',sans-serif;}
+.gantt-bar{transition:width 0.4s ease;}
+</style>
+</head>
+<body><div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useMemo}=React;
+
+const API="https://script.google.com/macros/s/AKfycbxcw3_VBpXXbpVYzLhG6E8qgRPPydlpeuGmiaL0N5RSwA13fByL1Jrg7-Ou1TGv-pyqAg/exec";
+
+const CATEGORIES=["Accounts Payable","Accounts Receivable","Bank Reconciliation","Budget Planning","Cash Flow","Compliance","Financial Report","Fixed Assets","Audit","Invoice Processing","Month-End Close","Year-End Close","Payroll","Tax Filing","Treasury","Intercompany","Cost Accounting","Management Reporting","Grant Accounting","Other"];
+
+const STATUS={
+  todo:{en:"To Do",lo:"ລໍຖ້າ",c:"#64748b",bg:"#f1f5f9"},
+  "in-progress":{en:"In Progress",lo:"ກໍາລັງດໍາເນີນ",c:"#2563eb",bg:"#eff6ff"},
+  review:{en:"In Review",lo:"ກໍາລັງກວດສອບ",c:"#7c3aed",bg:"#f5f3ff"},
+  done:{en:"Done",lo:"ສໍາເລັດ",c:"#16a34a",bg:"#f0fdf4"},
+  blocked:{en:"Blocked",lo:"ຕິດຂັດ",c:"#dc2626",bg:"#fef2f2"},
+};
+const PRIORITY={
+  low:{en:"Low",lo:"ຕໍ່າ",c:"#94a3b8"},
+  medium:{en:"Medium",lo:"ປານກາງ",c:"#f59e0b"},
+  high:{en:"High",lo:"ສູງ",c:"#f97316"},
+  urgent:{en:"Urgent",lo:"ດ່ວນ",c:"#dc2626"},
+};
+const PO={urgent:0,high:1,medium:2,low:3};
+
+const T={en:{
+  dashboard:"Dashboard",allJobs:"All Jobs",projects:"Projects",team:"Team",
+  monthly:"Monthly Jobs",pending:"Approvals",timeline:"Timeline",board:"Team Board",
+  signOut:"Sign Out",newJob:"+ New Job",newProject:"+ New Project",addUser:"+ Add User",
+  exportCSV:"↓ Excel",exportPDF:"↓ PDF",requestJob:"+ Request Job",
+  totalJobs:"Total Jobs",inProgress:"In Progress",completed:"Completed",overdue:"Overdue",
+  recentJobs:"Recent Jobs",projectsOverview:"Projects",jobTitle:"Job Title",
+  project:"Project",assignee:"Assignee",status:"Status",priority:"Priority",
+  startDate:"Start Date",dueDate:"Due Date",progress:"Progress",hours:"Hrs Est/Act",
+  actions:"Actions",edit:"Edit",del:"Del",cancel:"Cancel",save:"Save",
+  approve:"Approve",reject:"Reject",allStatus:"All Status",allPriority:"All Priority",
+  allProjects:"All Projects",search:"Search jobs...",noJobs:"No jobs found",
+  category:"Category",notes:"Notes",desc:"Description",estHrs:"Est. Hours",actHrs:"Actual Hours",
+  email:"Email",password:"Password",signIn:"Sign In",role:"Role",dept:"Department",
+  name:"Name",nameLao:"Name (Lao)",loading:"Loading...",saving:"Saving...",saved:"Saved!",
+  leader:"Leader",runner:"Runner/Staff",due:"Due",tasksDone:"tasks done",hrsLogged:"hrs logged",
+  viewAll:"View all →",viewJobs:"View Jobs →",clearFilter:"✕ Clear filters",
+  backToAll:"← Back to All Jobs",showDone:"Show Done",
+  pendingDesc:"Job requests awaiting leader approval",
+  generateNow:"Generate Now",addTemplate:"+ Add Template",
+},lo:{
+  dashboard:"ໜ້າຫຼັກ",allJobs:"ວຽກທັງໝົດ",projects:"ໂຄງການ",team:"ທີມງານ",
+  monthly:"ວຽກປະຈໍາເດືອນ",pending:"ລໍຄໍາອະນຸມັດ",timeline:"ເສັ້ນທາງເວລາ",board:"ກະດານທີມ",
+  signOut:"ອອກ",newJob:"+ ວຽກໃໝ່",newProject:"+ ໂຄງການໃໝ່",addUser:"+ ເພີ່ມຜູ້ໃຊ້",
+  exportCSV:"↓ Excel",exportPDF:"↓ PDF",requestJob:"+ ຂໍວຽກ",
+  totalJobs:"ວຽກທັງໝົດ",inProgress:"ກໍາລັງດໍາເນີນ",completed:"ສໍາເລັດ",overdue:"ເກີນກໍານົດ",
+  recentJobs:"ວຽກຫຼ້າສຸດ",projectsOverview:"ໂຄງການ",jobTitle:"ຊື່ວຽກ",
+  project:"ໂຄງການ",assignee:"ຜູ້ຮັບຜິດຊອບ",status:"ສະຖານະ",priority:"ຄວາມສໍາຄັນ",
+  startDate:"ວັນເລີ່ມ",dueDate:"ກໍານົດສ່ງ",progress:"ຄວາມຄືບໜ້າ",hours:"ຊມ ປ/ຕ",
+  actions:"ດໍາເນີນ",edit:"ແກ້ໄຂ",del:"ລຶບ",cancel:"ຍົກເລີກ",save:"ບັນທຶກ",
+  approve:"ອະນຸມັດ",reject:"ປະຕິເສດ",allStatus:"ທຸກສະຖານະ",allPriority:"ທຸກລະດັບ",
+  allProjects:"ທຸກໂຄງການ",search:"ຄົ້ນຫາວຽກ...",noJobs:"ບໍ່ພົບວຽກ",
+  category:"ປະເພດ",notes:"ໝາຍເຫດ",desc:"ລາຍລະອຽດ",estHrs:"ຊມ ປະມານ",actHrs:"ຊມ ຕົວຈິງ",
+  email:"ອີເມລ",password:"ລະຫັດ",signIn:"ເຂົ້າລະບົບ",role:"ບົດບາດ",dept:"ພະແນກ",
+  name:"ຊື່",nameLao:"ຊື່ (ລາວ)",loading:"ກໍາລັງໂຫລດ...",saving:"ກໍາລັງບັນທຶກ...",saved:"ບັນທຶກແລ້ວ!",
+  leader:"ຫົວໜ້າ",runner:"ພະນັກງານ",due:"ກໍານົດ",tasksDone:"ວຽກສໍາເລັດ",hrsLogged:"ຊມລວມ",
+  viewAll:"ເບິ່ງທັງໝົດ →",viewJobs:"ເບິ່ງວຽກ →",clearFilter:"✕ ລ້າງ",
+  backToAll:"← ກັບວຽກທັງໝົດ",showDone:"ສະແດງທີ່ສໍາເລັດ",
+  pendingDesc:"ຄໍາຂໍວຽກ ລໍຄໍາອະນຸມັດ",
+  generateNow:"ສ້າງວຽກ",addTemplate:"+ ເພີ່ມແມ່ແບບ",
+}};
+
+// API
+async function apiGet(p){
+  try{const r=await fetch(API+"?"+new URLSearchParams(p).toString());const tx=await r.text();const d=JSON.parse(tx);return sanitize(d);}catch(e){return{error:String(e)};}
+}
+async function apiPost(b){
+  try{
+    // Safest approach: encode JSON as a plain string value in URLSearchParams body.
+    // URLSearchParams handles ALL special chars (%, &, Lao, emoji, quotes) correctly.
+    // Apps Script doPost reads e.parameter.body directly — no URL involved at all.
+    const json=JSON.stringify(b);
+    const params=new URLSearchParams();
+    params.set("body",json);
+    const r=await fetch(API,{
+      method:"POST",
+      headers:{"Content-Type":"application/x-www-form-urlencoded"},
+      body:params.toString()
+    });
+    const tx=await r.text();
+    return JSON.parse(tx);
+  }catch(e){return{error:String(e)};}
+}
+function sanitize(o){
+  if(Array.isArray(o))return o.map(sanitize);
+  if(o&&typeof o==="object"){const n={};for(const k of Object.keys(o)){const v=o[k];if(typeof v==="string"&&v.match(/^\d{4}-\d{2}-\d{2}T/))n[k]=v.slice(0,10);else if(v instanceof Date)n[k]=v.toISOString().slice(0,10);else if(v&&typeof v==="object"&&!Array.isArray(v))n[k]=sanitize(v);else n[k]=v;}return n;}return o;
+}
+
+// Styles
+const IS={width:"100%",boxSizing:"border-box",padding:"9px 12px",borderRadius:8,border:"1px solid #e2e8f0",fontSize:13,color:"#1e293b",fontFamily:"'DM Sans','Noto Sans Lao',sans-serif",outline:"none",background:"#fff"};
+const SS={...IS,padding:"8px 12px"};
+const BS=(bg,x={})=>({padding:"8px 16px",borderRadius:8,border:"none",background:bg,color:"#fff",fontSize:13,fontWeight:600,...x});
+const tb={borderBottom:"1px solid #f1f5f9"};
+
+// Shared Components
+function Lbl({label,children}){return <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:700,color:"#374151",marginBottom:5,textTransform:"uppercase",letterSpacing:0.3}}>{label}</label>{children}</div>;}
+function Badge({status,lang}){const c=STATUS[status]||{en:status,lo:status,c:"#64748b",bg:"#f1f5f9"};return <span style={{padding:"3px 9px",borderRadius:99,fontSize:11,fontWeight:700,color:c.c,background:c.bg,whiteSpace:"nowrap"}}>{c[lang]||c.en}</span>;}
+function PriDot({priority,lang}){const c=PRIORITY[priority]||{en:priority,lo:priority,c:"#94a3b8"};return <span style={{fontSize:12,fontWeight:700,color:c.c,whiteSpace:"nowrap"}}>● {c[lang]||c.en}</span>;}
+function Avtr({user,size=30,showName=false}){
+  if(!user)return <span style={{color:"#94a3b8"}}>—</span>;
+  return <div style={{display:"flex",alignItems:"center",gap:7}}>
+    <div style={{width:size,height:size,borderRadius:"50%",flexShrink:0,background:user.role==="leader"?"linear-gradient(135deg,#3b82f6,#7c3aed)":"linear-gradient(135deg,#06b6d4,#10b981)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:Math.max(9,size*0.34),fontWeight:700,color:"#fff"}}>
+      {user.avatar||(user.name||"?")[0]}
+    </div>
+    {showName&&<span style={{fontSize:12,color:"#475569",fontWeight:500}}>{user.name?.split(" ")[0]}</span>}
+  </div>;
+}
+function Modal({title,onClose,onSave,saveLabel="Save",saveColor="#2563eb",saving,children,wide=false}){
+  return <div style={{position:"fixed",inset:0,background:"rgba(15,23,41,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <div style={{background:"#fff",borderRadius:16,padding:26,width:wide?660:540,maxHeight:"92vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)",animation:"fadeUp 0.2s ease"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <div style={{fontSize:17,fontWeight:700,color:"#0f172a"}}>{title}</div>
+        <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,color:"#94a3b8",padding:4}}>✕</button>
+      </div>
+      {children}
+      {onSave&&<div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:18}}>
+        <button onClick={onClose} style={{padding:"9px 18px",borderRadius:8,border:"1px solid #e2e8f0",background:"#fff",fontWeight:600,color:"#475569"}}>{T.en.cancel}</button>
+        <button onClick={onSave} disabled={saving} style={{...BS(saveColor),padding:"9px 22px",opacity:saving?0.7:1}}>{saving?"Saving...":saveLabel}</button>
+      </div>}
+    </div>
+  </div>;
+}
+
+// Job Form — FIXED: category always shows, works for edit
+function JobForm({form,set,projects,users,user,lang,isRequest=false}){
+  const t=T[lang];
+  return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+    <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (EN)"}><input value={form.title||""} onChange={e=>set("title",e.target.value)} style={IS} placeholder="e.g. Bank Reconciliation"/></Lbl></div>
+    <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (ລາວ)"}><input value={form.title_lao||""} onChange={e=>set("title_lao",e.target.value)} style={IS} placeholder="ຊື່ວຽກ ພາສາລາວ"/></Lbl></div>
+    <div style={{gridColumn:"1/-1"}}><Lbl label={t.desc}><textarea value={form.description||""} onChange={e=>set("description",e.target.value)} style={{...IS,height:55,resize:"vertical"}}/></Lbl></div>
+    <Lbl label={t.project}>
+      <select value={form.project_id||""} onChange={e=>set("project_id",e.target.value)} style={IS}>
+        <option value="">-- Select Project --</option>
+        {projects.map(p=><option key={p.id} value={p.id}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</option>)}
+      </select>
+    </Lbl>
+    <Lbl label={t.assignee}>
+      <select value={form.assignee_id||""} onChange={e=>set("assignee_id",e.target.value)} style={IS} disabled={isRequest}>
+        <option value="">-- Select --</option>
+        {(isRequest?[user]:users).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+      </select>
+    </Lbl>
+    <Lbl label={t.category}>
+      <select value={form.category||""} onChange={e=>set("category",e.target.value)} style={IS}>
+        <option value="">-- Select Category --</option>
+        {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+      </select>
+    </Lbl>
+    <Lbl label={t.priority}>
+      <select value={form.priority||"medium"} onChange={e=>set("priority",e.target.value)} style={IS}>
+        {Object.entries(PRIORITY).map(([k,v])=><option key={k} value={k}>{v[lang]||v.en}</option>)}
+      </select>
+    </Lbl>
+    {!isRequest&&<Lbl label={t.status}>
+      <select value={form.status||"todo"} onChange={e=>set("status",e.target.value)} style={IS}>
+        {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v[lang]||v.en}</option>)}
+      </select>
+    </Lbl>}
+    <Lbl label={t.startDate}><input type="date" value={form.start_date||""} onChange={e=>set("start_date",e.target.value)} style={IS}/></Lbl>
+    <Lbl label={t.dueDate}><input type="date" value={form.due_date||""} onChange={e=>set("due_date",e.target.value)} style={IS}/></Lbl>
+    <Lbl label={t.estHrs}><input type="number" min="1" value={form.estimated_hours||8} onChange={e=>set("estimated_hours",+e.target.value)} style={IS}/></Lbl>
+    {!isRequest&&<Lbl label={t.actHrs}><input type="number" min="0" value={form.actual_hours||0} onChange={e=>set("actual_hours",+e.target.value)} style={IS}/></Lbl>}
+    {!isRequest&&<div style={{gridColumn:"1/-1"}}>
+      <Lbl label={t.progress+": "+String(form.progress||0)+"%"}>
+        <input type="range" min="0" max="100" value={form.progress||0} onChange={e=>set("progress",+e.target.value)} style={{width:"100%",marginTop:4}}/>
+      </Lbl>
+    </div>}
+    <div style={{gridColumn:"1/-1"}}><Lbl label={t.notes}><textarea value={form.notes||""} onChange={e=>set("notes",e.target.value)} style={{...IS,height:50,resize:"vertical"}}/></Lbl></div>
+  </div>;
+}
+
+// ── LOGIN ──────────────────────────────────────────────────────
+function Login({onLogin,lang,setLang}){
+  const [email,setEmail]=useState("");const [pwd,setPwd]=useState("");
+  const [err,setErr]=useState("");const [loading,setLoading]=useState(false);const [shake,setShake]=useState(false);
+  const t=T[lang];
+  const doLogin=async()=>{
+    setLoading(true);setErr("");
+    try{
+      const res=await apiGet({action:"login",email,password:pwd});
+      if(res.success){const all=await apiGet({action:"getAll"});onLogin(res.user,all.users||[],all.projects||[],all.jobs||[],all.monthly||[],all.pending||[],all.board||[]);}
+      else{setErr(res.error||"Login failed");setShake(true);setTimeout(()=>setShake(false),600);}
+    }catch(e){setErr("Connection error");setShake(true);setTimeout(()=>setShake(false),600);}
+    setLoading(false);
+  };
+  return <div style={{height:"100vh",display:"flex",background:"#070d1a",position:"relative",overflow:"hidden"}}>
+    <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 25% 60%,#0f346099,transparent 55%),radial-gradient(ellipse at 75% 20%,#1a1a4e99,transparent 55%)"}}/>
+    {[...Array(7)].map((_,i)=><div key={i} style={{position:"absolute",top:0,bottom:0,left:`${i*16}%`,width:1,background:"linear-gradient(to bottom,transparent,#3b82f622,transparent)",pointerEvents:"none"}}/>)}
+    <div style={{position:"absolute",top:18,right:18,zIndex:10,display:"flex",gap:6}}>
+      {["en","lo"].map(l=><button key={l} onClick={()=>setLang(l)} style={{padding:"5px 12px",borderRadius:6,border:"1px solid rgba(255,255,255,0.15)",background:lang===l?"rgba(59,130,246,0.3)":"transparent",color:lang===l?"#93c5fd":"#64748b",fontSize:12,fontWeight:600}}>{l==="en"?"EN":"ລາວ"}</button>)}
+    </div>
+    <div style={{position:"relative",zIndex:1,margin:"auto",width:400,padding:20}}>
+      <div style={{textAlign:"center",marginBottom:24}}>
+        <div style={{fontSize:11,letterSpacing:4,color:"#3b82f6",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>FS Team Taskflow</div>
+        <div style={{fontSize:28,fontWeight:800,color:"#fff"}}>{lang==="lo"?"ການເງິນ & ບັນຊີ":"Finance & Accounting"}</div>
+        <div style={{color:"#64748b",fontSize:13,marginTop:5}}>{lang==="lo"?"ເຂົ້າສູ່ລະບົບ":"Sign in to your workspace"}</div>
+      </div>
+      <div style={{background:"rgba(255,255,255,0.04)",backdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:16,padding:30,boxShadow:"0 25px 60px rgba(0,0,0,0.5)",animation:shake?"shake 0.5s":"fadeUp 0.4s ease"}}>
+        <Lbl label={t.email}><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com" style={{...IS,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",color:"#e2e8f0"}}/></Lbl>
+        <Lbl label={t.password}><input value={pwd} onChange={e=>setPwd(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doLogin()} type="password" placeholder="••••••••" style={{...IS,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",color:"#e2e8f0"}}/></Lbl>
+        {err&&<div style={{color:"#f87171",fontSize:13,marginBottom:12,textAlign:"center"}}>{err}</div>}
+        <button onClick={doLogin} disabled={loading} style={{...BS("linear-gradient(135deg,#2563eb,#7c3aed)"),width:"100%",padding:"12px",fontSize:15,opacity:loading?0.7:1}}>
+          {loading?<><span className="spin">◌</span> {t.loading}</>:t.signIn}
+        </button>
+        <div style={{marginTop:18,borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:14}}>
+          <div style={{color:"#475569",fontSize:11,marginBottom:8,textAlign:"center",textTransform:"uppercase",letterSpacing:1}}>{lang==="lo"?"ບັນຊີທົດສອບ":"Demo Accounts"}</div>
+          {[{lbl:t.leader,email:"admin@company.com",pwd:"admin123"},{lbl:t.runner,email:"fin@company.com",pwd:"staff123"}].map(a=>(
+            <button key={a.lbl} onClick={()=>{setEmail(a.email);setPwd(a.pwd);}} style={{display:"block",width:"100%",marginBottom:5,padding:"7px 12px",borderRadius:6,border:"1px solid rgba(255,255,255,0.06)",background:"rgba(255,255,255,0.02)",color:"#64748b",fontSize:12,textAlign:"left"}}>
+              <strong style={{color:"#94a3b8"}}>{a.lbl}:</strong> {a.email} / {a.pwd}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>;
+}
+
+// ── DATE CLEANER — strips ISO timezone junk, returns "Mar 10" ──
+function cleanDate(raw){
+  if(!raw)return"—";
+  // Handle "2026-03-10T17:00:00.000Z" or "2026-03-10" → "Mar 10"
+  try{
+    const s=String(raw).slice(0,10); // "2026-03-10"
+    const [y,mo,d]=s.split("-").map(Number);
+    if(!y||!mo||!d)return String(raw).slice(0,10);
+    return new Date(y,mo-1,d).toLocaleDateString("en-US",{month:"short",day:"numeric"});
+  }catch(e){return String(raw).slice(0,10);}
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────────
+function Dashboard({stats,jobs,projects,user,getUser,onViewJobs,onViewMonthly,onJobClick,onViewFiltered,lang}){
+  const t=T[lang];
+  const now=new Date(),y=now.getFullYear(),m=now.getMonth()+1;
+  const myMonthly=jobs.filter(j=>j.id&&j.id.startsWith("mj_")&&j.id.includes(`_${y}_${m}`)&&(user.role==="leader"||j.assignee_id===user.id)).sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9));
+  const recent=[...jobs].filter(j=>user.role==="runner"?j.assignee_id===user.id:true).filter(j=>j.status!=="done"&&!(j.id&&j.id.startsWith("mj_"))).sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).slice(0,6);
+
+  // Stat cards — each clickable with its own navigation
+  const statCards=[
+    {lbl:t.totalJobs,   val:stats.total,      c:"#2563eb",i:"▣", action:()=>onViewJobs()},
+    {lbl:t.inProgress,  val:stats.inProgress,  c:"#f59e0b",i:"◑", action:()=>onViewFiltered("in-progress")},
+    {lbl:t.completed,   val:stats.done,        c:"#16a34a",i:"✓", action:()=>onViewFiltered("done")},
+    {lbl:t.overdue,     val:stats.overdue,     c:"#dc2626",i:"⚠", action:()=>onViewFiltered("overdue")},
+  ];
+
+  return <div style={{animation:"fadeUp 0.3s ease"}}>
+    {/* STAT CARDS — forced single row, min-width prevents wrap */}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:14,marginBottom:18}}>
+      {statCards.map(s=>(
+        <div key={s.lbl} onClick={s.action}
+          style={{background:"#fff",borderRadius:12,padding:"16px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`3px solid ${s.c}`,cursor:"pointer",transition:"box-shadow 0.15s,transform 0.12s"}}
+          onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 6px 20px ${s.c}28`;e.currentTarget.style.transform="translateY(-2px)";}}
+          onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)";e.currentTarget.style.transform="";}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div>
+              <div style={{color:"#94a3b8",fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:0.4,whiteSpace:"nowrap"}}>{s.lbl}</div>
+              <div style={{fontSize:28,fontWeight:800,color:"#0f172a",marginTop:2}}>{s.val}</div>
+            </div>
+            <div style={{width:36,height:36,borderRadius:10,background:s.c+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:s.c}}>{s.i}</div>
+          </div>
+          <div style={{fontSize:10,color:s.c,fontWeight:600,marginTop:4,opacity:0.8}}>{lang==="lo"?"ຄລິກເພື່ອເບິ່ງ →":"click to view →"}</div>
+        </div>
+      ))}
+    </div>
+
+    {/* MONTHLY CARDS */}
+    {myMonthly.length>0&&<div style={{marginBottom:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>
+          📅 {lang==="lo"?"ວຽກປະຈໍາເດືອນ":"Monthly Routine"} — {String(m).padStart(2,"0")}/{y}
+          <span style={{marginLeft:8,fontSize:12,color:"#64748b",fontWeight:400}}>({myMonthly.filter(j=>j.status==="done").length}/{myMonthly.length} {lang==="lo"?"ສໍາເລັດ":"done"})</span>
+        </div>
+        <button onClick={onViewMonthly} style={{fontSize:12,color:"#2563eb",background:"none",border:"none",fontWeight:600,cursor:"pointer"}}>{t.viewAll}</button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:12}}>
+        {myMonthly.map(j=>{
+          const od=new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done";
+          const pg=Number(j.progress)||0;
+          const borderC=j.status==="done"?"#16a34a":od?"#dc2626":PRIORITY[j.priority]?.c||"#3b82f6";
+          return <div key={j.id} onClick={()=>onJobClick(j)}
+            style={{background:"#fff",borderRadius:12,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`3px solid ${borderC}`,cursor:"pointer",transition:"box-shadow 0.15s,transform 0.15s"}}
+            onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.12)";e.currentTarget.style.transform="translateY(-2px)";}}
+            onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)";e.currentTarget.style.transform="";}}>
+            <div style={{fontWeight:700,color:"#0f172a",fontSize:13,marginBottom:6,lineHeight:1.3}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+            <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:8}}>
+              <Badge status={j.status} lang={lang}/>
+              {od&&<span style={{fontSize:10,color:"#dc2626",fontWeight:700}}>⚠</span>}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+              <div style={{flex:1,height:5,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":borderC,borderRadius:99}}/>
+              </div>
+              <span style={{fontSize:11,color:"#64748b",fontWeight:600,flexShrink:0}}>{pg}%</span>
+            </div>
+            <div style={{fontSize:11,color:"#94a3b8"}}>{t.due} {cleanDate(j.due_date)}</div>
+          </div>;
+        })}
+      </div>
+    </div>}
+
+    <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:16}}>
+      {/* Recent Jobs */}
+      <div style={{background:"#fff",borderRadius:12,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{t.recentJobs}</div>
+          <button onClick={onViewJobs} style={{fontSize:12,color:"#2563eb",background:"none",border:"none",fontWeight:600,cursor:"pointer"}}>{t.viewAll}</button>
+        </div>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+          <thead><tr>{[t.jobTitle,t.assignee,t.status,t.priority,t.dueDate].map(h=><th key={h} style={{textAlign:"left",padding:"7px 10px",color:"#94a3b8",fontWeight:600,fontSize:11,textTransform:"uppercase",borderBottom:"1px solid #f1f5f9"}}>{h}</th>)}</tr></thead>
+          <tbody>
+            {recent.length===0&&<tr><td colSpan={5} style={{textAlign:"center",padding:20,color:"#94a3b8",fontSize:12}}>✅ {lang==="lo"?"ວຽກທັງໝົດສໍາເລັດ":"All caught up!"}</td></tr>}
+            {recent.map(j=>{
+              const od=new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done";
+              return <tr key={j.id} style={tb} onClick={()=>onJobClick(j)} onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"} onMouseLeave={e=>e.currentTarget.style.background=""}>
+                <td style={{padding:"8px 10px",cursor:"pointer"}}><div style={{fontWeight:600,color:"#1e293b",fontSize:13}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div><div style={{fontSize:11,color:"#94a3b8"}}>{j.category}</div></td>
+                <td style={{padding:"8px 10px"}}><Avtr user={getUser(j.assignee_id)} size={24}/></td>
+                <td style={{padding:"8px 10px"}}><Badge status={j.status} lang={lang}/></td>
+                <td style={{padding:"8px 10px"}}><PriDot priority={j.priority} lang={lang}/></td>
+                <td style={{padding:"8px 10px",color:od?"#dc2626":"#64748b",fontWeight:od?700:400,fontSize:12,whiteSpace:"nowrap"}}>{od?"⚠ ":""}{cleanDate(j.due_date)}</td>
+              </tr>;
+            })}
+          </tbody>
+        </table>
+      </div>
+      {/* Projects */}
+      <div style={{background:"#fff",borderRadius:12,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+        <div style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:12}}>{t.projectsOverview}</div>
+        {projects.map(p=>{
+          const pj=jobs.filter(j=>j.project_id===p.id),dn=pj.filter(j=>j.status==="done").length,pct=pj.length?Math.round((dn/pj.length)*100):0;
+          return <div key={p.id} style={{marginBottom:14,cursor:"pointer",padding:"6px 8px",borderRadius:8,transition:"background 0.12s"}}
+            onClick={()=>onViewFiltered("proj_"+p.id)}
+            onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"}
+            onMouseLeave={e=>e.currentTarget.style.background=""}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+              <div style={{fontWeight:600,color:"#1e293b",fontSize:13}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div>
+              <div style={{color:"#64748b",fontSize:12}}>{pct}%</div>
+            </div>
+            <div style={{height:6,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${pct}%`,background:pct===100?"#16a34a":"linear-gradient(90deg,#3b82f6,#7c3aed)",borderRadius:99,transition:"width 0.8s"}}/>
+            </div>
+            <div style={{color:"#94a3b8",fontSize:11,marginTop:2}}>{dn}/{pj.length} {t.tasksDone} · {t.due} {cleanDate(p.due_date)}</div>
+          </div>;
+        })}
+      </div>
+    </div>
+  </div>;
+}
+
+// ── JOBS PAGE ──────────────────────────────────────────────────
+// ── INLINE JOB DETAIL PANEL ────────────────────────────────────
+function JobDetailPanel({job,user,getUser,projects,lang,onSave,onClose,saving}){
+  const t=T[lang];
+  const [pg,setPg]=useState(Number(job.progress)||0);
+  const [status,setStatus]=useState(job.status||"todo");
+  const [actHrs,setActHrs]=useState(Number(job.actual_hours)||0);
+  const [notes,setNotes]=useState(job.notes||"");
+  const [dirty,setDirty]=useState(false);
+  const [pgInput,setPgInput]=useState(String(Number(job.progress)||0)); // direct text input for %
+  const mark=(k,v)=>{if(k==="progress"){setPg(v);setPgInput(String(v));}if(k==="status")setStatus(v);if(k==="actual_hours")setActHrs(v);if(k==="notes")setNotes(v);setDirty(true);};
+  const handleSave=()=>onSave({...job,progress:pg,status,actual_hours:actHrs,notes});
+  const od=new Date(String(job.due_date).slice(0,10))<new Date()&&status!=="done";
+  const pgColor=pg===100?"#16a34a":pg>=70?"#3b82f6":pg>=30?"#f59e0b":"#dc2626";
+  const canEdit=user.role==="leader"||job.assignee_id===user.id;
+
+  // Days running: how long this job has been in-progress
+  const startD=job.start_date?new Date(String(job.start_date).slice(0,10)):null;
+  const daysRunning=startD?Math.max(0,Math.round((new Date()-startD)/(1000*60*60*24))):null;
+  const daysLeft=job.due_date?Math.round((new Date(String(job.due_date).slice(0,10))-new Date())/(1000*60*60*24)):null;
+  const isLongRunning=daysRunning!==null&&daysRunning>14&&status!=="done";
+  const expectedPg=daysRunning!==null&&daysLeft!==null&&(daysRunning+Math.max(0,daysLeft))>0
+    ?Math.round(daysRunning/(daysRunning+Math.max(0,daysLeft))*100):null;
+  const isBehind=expectedPg!==null&&pg<expectedPg-15;
+
+  return (
+    <div style={{background:"#f8fafc",borderTop:"2px solid #dbeafe",padding:"16px 20px 18px",animation:"fadeUp 0.18s ease"}}>
+      {/* Long-running job warning banner */}
+      {isLongRunning&&<div style={{marginBottom:12,padding:"8px 14px",borderRadius:8,background:isBehind?"#fef2f2":"#fefce8",border:`1px solid ${isBehind?"#fca5a5":"#fde047"}`,display:"flex",alignItems:"center",gap:8,fontSize:12}}>
+        <span style={{fontSize:15}}>{isBehind?"⚠️":"⏳"}</span>
+        <div>
+          <span style={{fontWeight:700,color:isBehind?"#dc2626":"#92400e"}}>
+            {isBehind
+              ?(lang==="lo"?"ວຽກນີ້ລ້າຊ້າກ່ວາແຜນ":"This job is behind schedule")
+              :(lang==="lo"?"ວຽກດໍາເນີນມາ "+daysRunning+" ວັນ":"Running for "+daysRunning+" days")}
+          </span>
+          {isBehind&&<span style={{color:"#dc2626",marginLeft:6}}>— expected ~{expectedPg}%, current {pg}%</span>}
+          {daysLeft!==null&&<span style={{color:"#94a3b8",marginLeft:6}}>· {daysLeft>0?daysLeft+" days left":Math.abs(daysLeft)+" days overdue"}</span>}
+        </div>
+      </div>}
+
+      <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:16}}>
+        {/* LEFT — Progress + Status */}
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {/* Progress card */}
+          <div style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:"1px solid #e8edf5"}}>
+            <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>{lang==="lo"?"ຄວາມຄືບໜ້າ":"Progress"}</div>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+              {/* Mini ring */}
+              <svg width="64" height="64" viewBox="0 0 100 100" style={{flexShrink:0}}>
+                <circle cx="50" cy="50" r="42" fill="none" stroke="#f1f5f9" strokeWidth="12"/>
+                {/* Expected progress ghost ring */}
+                {expectedPg!==null&&<circle cx="50" cy="50" r="42" fill="none" stroke="#e2e8f0" strokeWidth="4"
+                  strokeDasharray={`${2*Math.PI*42}`}
+                  strokeDashoffset={`${2*Math.PI*42*(1-expectedPg/100)}`}
+                  strokeLinecap="round" transform="rotate(-90 50 50)" strokeOpacity="0.6"/>}
+                <circle cx="50" cy="50" r="42" fill="none" stroke={pgColor} strokeWidth="12"
+                  strokeDasharray={`${2*Math.PI*42}`}
+                  strokeDashoffset={`${2*Math.PI*42*(1-pg/100)}`}
+                  strokeLinecap="round" transform="rotate(-90 50 50)"
+                  style={{transition:"stroke-dashoffset 0.35s ease"}}/>
+                <text x="50" y="56" textAnchor="middle" fontSize="22" fontWeight="800" fill="#0f172a">{pg}%</text>
+              </svg>
+              <div style={{flex:1}}>
+                <input type="range" min="0" max="100" step="1" value={pg} onChange={e=>mark("progress",+e.target.value)}
+                  disabled={!canEdit} style={{width:"100%",accentColor:pgColor,marginBottom:6}}/>
+                {/* Direct % input */}
+                <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:6}}>
+                  <input type="number" min="0" max="100" value={pgInput}
+                    onChange={e=>{setPgInput(e.target.value);}}
+                    onBlur={e=>{const v=Math.min(100,Math.max(0,+e.target.value||0));mark("progress",v);}}
+                    onKeyDown={e=>e.key==="Enter"&&mark("progress",Math.min(100,Math.max(0,+pgInput||0)))}
+                    readOnly={!canEdit}
+                    style={{...IS,width:58,textAlign:"center",padding:"4px 6px",fontSize:13,fontWeight:700}}/>
+                  <span style={{fontSize:11,color:"#94a3b8"}}>%</span>
+                  {expectedPg!==null&&<span style={{fontSize:10,color:"#94a3b8",marginLeft:2}}>expected {expectedPg}%</span>}
+                </div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                  {[0,10,25,50,75,90,100].map(v=>(
+                    <button key={v} onClick={()=>canEdit&&mark("progress",v)} disabled={!canEdit}
+                      style={{flex:1,padding:"3px 0",borderRadius:5,border:`1.5px solid ${pg===v?pgColor:"#e2e8f0"}`,background:pg===v?pgColor+"18":"#fff",color:pg===v?pgColor:"#94a3b8",fontSize:10,fontWeight:700,cursor:canEdit?"pointer":"default",minWidth:24}}>
+                      {v}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {/* Days info */}
+            {(daysRunning!==null||daysLeft!==null)&&<div style={{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid #f1f5f9",fontSize:10,color:"#94a3b8"}}>
+              {daysRunning!==null&&<span>▶ {daysRunning}d {lang==="lo"?"ແລ້ວ":"running"}</span>}
+              {daysLeft!==null&&<span style={{color:daysLeft<0?"#dc2626":daysLeft<3?"#f59e0b":"#94a3b8",fontWeight:daysLeft<3?700:400}}>{daysLeft<0?"⚠ "+Math.abs(daysLeft)+"d overdue":daysLeft===0?"Due today":"◷ "+daysLeft+"d left"}</span>}
+            </div>}
+          </div>
+
+          {/* Status buttons — compact 2-col */}
+          <div style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:"1px solid #e8edf5"}}>
+            <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5,marginBottom:8}}>{lang==="lo"?"ສະຖານະ":"Status"}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}}>
+              {Object.entries(STATUS).map(([k,v])=>(
+                <button key={k} onClick={()=>canEdit&&mark("status",k)} disabled={!canEdit}
+                  style={{display:"flex",alignItems:"center",gap:5,padding:"6px 8px",borderRadius:7,border:`1.5px solid ${status===k?v.c:"#e2e8f0"}`,background:status===k?v.bg:"#fff",cursor:canEdit?"pointer":"default",transition:"all 0.1s"}}>
+                  <div style={{width:7,height:7,borderRadius:"50%",background:v.c,flexShrink:0}}/>
+                  <span style={{fontSize:11,fontWeight:status===k?700:500,color:status===k?v.c:"#64748b",flex:1,textAlign:"left"}}>{v[lang]||v.en}</span>
+                  {status===k&&<span style={{fontSize:10,color:v.c}}>✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT — Notes */}
+        <div style={{background:"#fff",borderRadius:10,padding:"14px 16px",border:"1px solid #e8edf5",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>
+              📝 {lang==="lo"?"ໝາຍເຫດ / ຄວາມຄືບໜ້າ":"Notes / Progress Log"}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              {od&&<span style={{fontSize:10,color:"#dc2626",fontWeight:700,background:"#fef2f2",padding:"2px 7px",borderRadius:99}}>⚠ {lang==="lo"?"ເກີນກໍານົດ":"Overdue"}</span>}
+              <Badge status={status} lang={lang}/>
+            </div>
+          </div>
+          {job.notes&&notes!==job.notes&&<div style={{fontSize:11,color:"#94a3b8",marginBottom:8,padding:"6px 8px",background:"#f8fafc",borderRadius:6,border:"1px solid #e8edf5",lineHeight:1.5,maxHeight:60,overflow:"auto"}}>
+            <span style={{fontWeight:700,color:"#94a3b8"}}>Previous: </span>{job.notes}
+          </div>}
+          <textarea value={notes} onChange={e=>canEdit&&mark("notes",e.target.value)}
+            readOnly={!canEdit}
+            style={{...IS,flex:1,minHeight:100,resize:"vertical",fontSize:13,lineHeight:1.6,background:canEdit?"#fff":"#f8fafc",color:"#1e293b"}}
+            placeholder={lang==="lo"
+              ?"ຂຽນຄວາມຄືບໜ້າ, ສິ່ງທີ່ຕິດຂັດ, ຫຼືໝາຍເຫດ...\n\nຕົວຢ່າງ:\n✓ ສຳເລັດການກວດສອບເອກະສານ\n⚠ ລໍຂໍ້ມູນຈາກທີມ HR\n→ ຂັ້ນຕອນຕໍ່ໄປ: ສົ່ງລາຍງານ"
+              :"Write your progress, blockers, or notes...\n\nExamples:\n✓ Completed document review\n⚠ Waiting for data from HR team\n→ Next step: submit final report"}/>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,paddingTop:8,borderTop:"1px solid #f1f5f9"}}>
+            <div style={{fontSize:11,color:"#94a3b8"}}>{lang==="lo"?"ອັບເດດລ່າສຸດ: ":"Last updated: "}{cleanDate(job.updated_at)}</div>
+            {dirty&&<span style={{fontSize:11,color:"#f59e0b",fontWeight:600}}>● {lang==="lo"?"ມີການປ່ຽນແປງ":"Unsaved changes"}</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Action bar */}
+      <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:12}}>
+        <button onClick={onClose} style={{padding:"6px 16px",borderRadius:8,border:"1px solid #e2e8f0",background:"#fff",color:"#64748b",fontWeight:600,fontSize:13,cursor:"pointer"}}>{lang==="lo"?"ປິດ":"Close"}</button>
+        {canEdit&&<button onClick={handleSave} disabled={saving||!dirty}
+          style={{...BS(dirty?"#16a34a":"#94a3b8"),padding:"6px 20px",fontSize:13,opacity:(saving||!dirty)?0.55:1,cursor:dirty&&!saving?"pointer":"default"}}>
+          {saving?(lang==="lo"?"ກໍາລັງບັນທຶກ...":"Saving..."):(lang==="lo"?"💾 ບັນທຶກ":"💾 Save")}
+        </button>}
+      </div>
+    </div>
+  );
+}
+
+// ── JOBS PAGE — grouped by project, click row to expand ────────
+function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,projects,users,user,getUser,onEdit,onDelete,onInlineUpdate,lang,loading,saving}){
+  const t=T[lang];
+  const [fStatus,setFStatus]=useState("all");
+  const [fPri,setFPri]=useState("all");
+  const [fProj,setFProj]=useState(filterProj||"all");
+  const [fUser,setFUser]=useState("all");
+  const [q,setQ]=useState("");
+  const [showDone,setShowDone]=useState(false);
+  const [showHrs,setShowHrs]=useState(false);
+  const [expandedId,setExpandedId]=useState(null);
+  const [collapsedProj,setCollapsedProj]=useState({});
+
+  useEffect(()=>{if(filterProj)setFProj(filterProj);},[filterProj]);
+  useEffect(()=>{
+    if(dashFilter==="in-progress"){setFStatus("in-progress");setShowDone(false);}
+    else if(dashFilter==="done"){setFStatus("done");setShowDone(true);}
+    else if(dashFilter==="overdue"){setFStatus("all");setShowDone(false);}
+  },[dashFilter]);
+
+  const filtered=allJobs.filter(j=>{
+    if(user.role==="runner"&&j.assignee_id!==user.id)return false;
+    if(!showDone&&j.status==="done")return false;
+    if(fStatus!=="all"&&j.status!==fStatus)return false;
+    if(fPri!=="all"&&j.priority!==fPri)return false;
+    if(fProj!=="all"&&j.project_id!==fProj)return false;
+    if(fUser!=="all"&&j.assignee_id!==fUser)return false;
+    if(dashFilter==="overdue"&&!(new Date(String(j.due_date).slice(0,10))<new Date()&&j.status!=="done"))return false;
+    if(q&&!(j.title+"|"+(j.title_lao||"")).toLowerCase().includes(q.toLowerCase()))return false;
+    return true;
+  }).sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9));
+
+  const hasFilter=fStatus!=="all"||fPri!=="all"||fProj!=="all"||fUser!=="all"||q||showDone||dashFilter;
+  const clearAll=()=>{setFStatus("all");setFPri("all");setFProj("all");setFUser("all");setQ("");setShowDone(false);setFilterProj(null);clearDashFilter();};
+  const fmtDate=(d,od)=>{const s=cleanDate(d);return od?"⚠ "+s:s;};
+
+  const grouped=useMemo(()=>{
+    const map={};
+    filtered.forEach(j=>{const pid=j.project_id||"__none__";if(!map[pid])map[pid]=[];map[pid].push(j);});
+    const result=[];
+    projects.forEach(p=>{if(map[p.id])result.push({proj:p,jobs:map[p.id]});});
+    if(map["__none__"])result.push({proj:null,jobs:map["__none__"]});
+    return result;
+  },[filtered,projects]);
+
+  const toggleProj=(pid)=>setCollapsedProj(p=>({...p,[pid||"__none__"]:!p[pid||"__none__"]}));
+  const toggleRow=(id)=>setExpandedId(prev=>prev===id?null:id);
+
+  const sc={active:"#2563eb",planning:"#7c3aed",completed:"#16a34a",paused:"#f59e0b"};
+
+  return <div style={{animation:"fadeUp 0.3s ease"}}>
+    {/* FILTER BAR */}
+    <div style={{background:"#fff",borderRadius:12,padding:"13px 16px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+      <div style={{display:"flex",gap:9,alignItems:"center",flexWrap:"nowrap",overflowX:"auto"}}>
+        <div style={{position:"relative",flexShrink:0,minWidth:170}}>
+          <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"#94a3b8",fontSize:13,pointerEvents:"none"}}>🔍</span>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder={t.search}
+            style={{...SS,paddingLeft:30,borderRadius:20,background:"#f8fafc",border:"1px solid #e8edf5",minWidth:170}}/>
+        </div>
+        {[
+          {val:fStatus,set:setFStatus,label:t.allStatus,opts:Object.entries(STATUS).map(([k,v])=>({k,l:v[lang]||v.en}))},
+          {val:fPri,set:setFPri,label:t.allPriority,opts:Object.entries(PRIORITY).map(([k,v])=>({k,l:v[lang]||v.en}))},
+          {val:fProj,set:(v)=>{setFProj(v);setFilterProj(v==="all"?null:v);},label:t.allProjects,opts:projects.map(p=>({k:p.id,l:lang==="lo"&&p.name_lao?p.name_lao:p.name}))},
+          ...(user.role==="leader"?[{val:fUser,set:setFUser,label:lang==="lo"?"ທຸກຄົນ":"All Staff",opts:users.map(u=>({k:u.id,l:u.name}))}]:[]),
+        ].map((dd,i)=>(
+          <div key={i} style={{position:"relative",flexShrink:0}}>
+            <select value={dd.val} onChange={e=>dd.set(e.target.value)}
+              style={{...SS,paddingRight:26,appearance:"none",WebkitAppearance:"none",background:"#fff",border:"1px solid #e2e8f0",borderRadius:8,minWidth:i===2?155:115,fontWeight:dd.val!=="all"?600:400,color:dd.val!=="all"?"#1e293b":"#64748b",cursor:"pointer"}}>
+              <option value="all">{dd.label}</option>
+              {dd.opts.map(o=><option key={o.k} value={o.k}>{o.l}</option>)}
+            </select>
+            <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#94a3b8",fontSize:10}}>▼</span>
+          </div>
+        ))}
+        <label style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:"#64748b",cursor:"pointer",userSelect:"none",flexShrink:0,whiteSpace:"nowrap"}}>
+          <input type="checkbox" checked={showDone} onChange={e=>setShowDone(e.target.checked)} style={{cursor:"pointer"}}/>{t.showDone}
+        </label>
+        <label style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:"#64748b",cursor:"pointer",userSelect:"none",flexShrink:0,whiteSpace:"nowrap"}}>
+          <input type="checkbox" checked={showHrs} onChange={e=>setShowHrs(e.target.checked)} style={{cursor:"pointer"}}/>{lang==="lo"?"ສະແດງຊມ":"Show Hrs"}
+        </label>
+        {hasFilter&&<button onClick={clearAll} style={{padding:"6px 12px",borderRadius:8,border:"1px solid #fca5a5",background:"#fef2f2",color:"#dc2626",fontSize:12,fontWeight:600,whiteSpace:"nowrap",flexShrink:0,cursor:"pointer"}}>✕ {lang==="lo"?"ລ້າງ":"Clear"}</button>}
+        <span style={{marginLeft:"auto",color:"#94a3b8",fontSize:12,whiteSpace:"nowrap",flexShrink:0}}>{filtered.length} {lang==="lo"?"ວຽກ":"jobs"}</span>
+      </div>
+      {dashFilter&&<div style={{marginTop:7,display:"flex",alignItems:"center",gap:6}}>
+        <span style={{fontSize:11,padding:"2px 10px",borderRadius:99,background:dashFilter==="overdue"?"#fef2f2":dashFilter==="done"?"#f0fdf4":"#eff6ff",color:dashFilter==="overdue"?"#dc2626":dashFilter==="done"?"#16a34a":"#2563eb",fontWeight:700}}>
+          {dashFilter==="overdue"?"⚠ Overdue":dashFilter==="done"?"✓ Completed":"◑ In Progress"}
+        </span>
+        <button onClick={clearAll} style={{fontSize:11,color:"#dc2626",background:"none",border:"none",fontWeight:700,cursor:"pointer"}}>✕</button>
+      </div>}
+      {fProj!=="all"&&<div style={{marginTop:7,display:"flex",alignItems:"center",gap:6}}>
+        <span style={{fontSize:11,color:"#64748b"}}>Project: <strong style={{color:"#2563eb"}}>{projects.find(p=>p.id===fProj)?.[lang==="lo"?"name_lao":"name"]||projects.find(p=>p.id===fProj)?.name}</strong></span>
+        <button onClick={()=>{setFProj("all");setFilterProj(null);}} style={{fontSize:11,color:"#dc2626",background:"none",border:"none",fontWeight:700,cursor:"pointer"}}>✕</button>
+      </div>}
+    </div>
+
+    {/* GROUPED TABLE */}
+    <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+      {loading&&<div style={{textAlign:"center",padding:32,color:"#94a3b8"}}>⏳ {t.loading}</div>}
+      {!loading&&filtered.length===0&&<div style={{textAlign:"center",padding:40,color:"#94a3b8"}}>{t.noJobs}</div>}
+      {grouped.map(({proj,jobs:pJobs})=>{
+        const pid=proj?.id||"__none__";
+        const isCollapsed=collapsedProj[pid];
+        const projColor=sc[proj?.status]||"#94a3b8";
+        const dnCount=pJobs.filter(j=>j.status==="done").length;
+        return (
+          <div key={pid} style={{borderBottom:"2px solid #f0f4f8"}}>
+            {/* PROJECT GROUP HEADER — clickable to collapse */}
+            <div onClick={()=>toggleProj(pid)}
+              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 16px",background:"#f8fafc",cursor:"pointer",userSelect:"none",borderBottom:"1px solid #e8edf5"}}
+              onMouseEnter={e=>e.currentTarget.style.background="#eef2f7"}
+              onMouseLeave={e=>e.currentTarget.style.background="#f8fafc"}>
+              <span style={{fontSize:11,color:"#94a3b8",display:"inline-block",transition:"transform 0.2s",transform:isCollapsed?"rotate(-90deg)":"rotate(0deg)"}}>▾</span>
+              {proj&&<div style={{width:10,height:10,borderRadius:2,background:projColor,flexShrink:0}}/>}
+              <span style={{fontWeight:700,color:"#0f172a",fontSize:13}}>{proj?(lang==="lo"&&proj.name_lao?proj.name_lao:proj.name):(lang==="lo"?"ບໍ່ມີໂຄງການ":"No Project")}</span>
+              {proj&&<span style={{fontSize:10,padding:"1px 7px",borderRadius:99,background:projColor+"18",color:projColor,fontWeight:700,textTransform:"capitalize"}}>{proj.status}</span>}
+              <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:5}}>
+                  <div style={{width:56,height:4,background:"#e2e8f0",borderRadius:99,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${pJobs.length?Math.round(dnCount/pJobs.length*100):0}%`,background:projColor,borderRadius:99}}/>
+                  </div>
+                  <span style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>{dnCount}/{pJobs.length}</span>
+                </div>
+              </div>
+            </div>
+            {/* JOB ROWS */}
+            {!isCollapsed&&<>
+              {/* Column headers (shown once per group) */}
+              <div style={{display:"grid",gridTemplateColumns:"32px 1fr 130px 100px 100px 80px 75px 90px"+(showHrs?" 80px":"")+" 90px",background:"#fafbfc",borderBottom:"1px solid #e8edf5",padding:"0 0"}}>
+                {["","Job Title","Category","Assignee","Status","Priority","Due","Progress",...(showHrs?["Hours"]:[]),"Actions"].map((h,i)=>(
+                  <div key={i} style={{padding:"7px 10px",fontSize:10,fontWeight:700,color:"#b0bec5",textTransform:"uppercase",letterSpacing:0.4,overflow:"hidden",whiteSpace:"nowrap"}}>{h}</div>
+                ))}
+              </div>
+              {pJobs.map(j=>{
+                const od=new Date(String(j.due_date).slice(0,10))<new Date()&&j.status!=="done";
+                const pg=Number(j.progress)||0;
+                const isExpanded=expandedId===j.id;
+                return (
+                  <div key={j.id} style={{borderBottom:"1px solid #f1f5f9"}}>
+                    {/* ROW */}
+                    <div onClick={()=>toggleRow(j.id)}
+                      style={{display:"grid",gridTemplateColumns:"32px 1fr 130px 100px 100px 80px 75px 90px"+(showHrs?" 80px":"")+" 90px",alignItems:"center",background:isExpanded?"#eff6ff":"",opacity:j.status==="done"?0.65:1,cursor:"pointer",transition:"background 0.1s"}}
+                      onMouseEnter={e=>{if(!isExpanded)e.currentTarget.style.background="#f8fafc";}}
+                      onMouseLeave={e=>{if(!isExpanded)e.currentTarget.style.background="";}}>
+                      {/* Chevron */}
+                      <div style={{padding:"0 0 0 12px",color:"#94a3b8",fontSize:10,transition:"transform 0.2s",transform:isExpanded?"rotate(90deg)":"rotate(0deg)"}}>▶</div>
+                      {/* Title */}
+                      <div style={{padding:"10px 10px 10px 4px"}}>
+                        <div style={{fontWeight:600,color:"#1e293b",fontSize:13,lineHeight:1.3}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+                        <div style={{color:"#94a3b8",fontSize:11,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.description||""}</div>
+                      </div>
+                      <div style={{padding:"10px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:99,background:"#f0f9ff",color:"#0369a1",fontWeight:600,display:"inline-block",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.category||"—"}</span></div>
+                      <div style={{padding:"10px"}}><Avtr user={getUser(j.assignee_id)} size={22} showName/></div>
+                      <div style={{padding:"10px"}}><Badge status={j.status} lang={lang}/></div>
+                      <div style={{padding:"10px"}}><PriDot priority={j.priority} lang={lang}/></div>
+                      <div style={{padding:"10px",color:od?"#dc2626":"#64748b",fontWeight:od?700:400,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(j.due_date,od)}</div>
+                      <div style={{padding:"10px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:4}}>
+                          <div style={{flex:1,height:5,background:"#f1f5f9",borderRadius:99,overflow:"hidden",minWidth:36}}>
+                            <div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":"#3b82f6",borderRadius:99,transition:"width 0.4s"}}/>
+                          </div>
+                          <span style={{color:"#64748b",fontSize:11,fontWeight:600,flexShrink:0}}>{pg}%</span>
+                        </div>
+                      </div>
+                      {showHrs&&<div style={{padding:"10px",color:"#94a3b8",fontSize:12,whiteSpace:"nowrap"}}>{j.estimated_hours||0}h/{j.actual_hours||0}h</div>}
+                      <div style={{padding:"10px"}} onClick={e=>e.stopPropagation()}>
+                        {user.role==="leader"&&<div style={{display:"flex",gap:4}}>
+                          <button onClick={()=>onEdit(j)} style={{...BS("#2563eb"),padding:"4px 8px",fontSize:11}}>{t.edit}</button>
+                          <button onClick={()=>onDelete(j.id)} style={{...BS("#dc2626"),padding:"4px 8px",fontSize:11}}>{t.del}</button>
+                        </div>}
+                        {user.role!=="leader"&&j.assignee_id===user.id&&<span style={{fontSize:10,color:"#94a3b8"}}>↕ expand</span>}
+                      </div>
+                    </div>
+                    {/* EXPANDED DETAIL PANEL */}
+                    {isExpanded&&<JobDetailPanel job={j} user={user} getUser={getUser} projects={projects} lang={lang} saving={saving}
+                      onSave={(updated)=>{onInlineUpdate(updated);setExpandedId(null);}}
+                      onClose={()=>setExpandedId(null)}/>}
+                  </div>
+                );
+              })}
+            </>}
+          </div>
+        );
+      })}
+    </div>
+  </div>;
+}
+
+
+// ── PROJECTS PAGE ──────────────────────────────────────────────
+function ProjectsPage({projects,jobs,user,getUser,onSelectProj,onEdit,onDelete,lang}){
+  const t=T[lang];
+  const sc={active:"#2563eb",planning:"#7c3aed",completed:"#16a34a",paused:"#f59e0b"};
+  return <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16,animation:"fadeUp 0.3s ease"}}>
+    {projects.map(p=>{const pj=jobs.filter(j=>j.project_id===p.id),dn=pj.filter(j=>j.status==="done").length,pct=pj.length?Math.round((dn/pj.length)*100):0;
+    return <div key={p.id} style={{background:"#fff",borderRadius:14,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`4px solid ${sc[p.status]||"#94a3b8"}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><div style={{fontSize:14,fontWeight:700,color:"#0f172a"}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div><PriDot priority={p.priority} lang={lang}/></div>
+      <div style={{fontSize:11,padding:"2px 8px",borderRadius:99,background:"#f0f9ff",color:"#0369a1",fontWeight:600,display:"inline-block",marginBottom:10}}>{p.category}</div>
+      <div style={{color:"#64748b",fontSize:12,marginBottom:12,lineHeight:1.5}}>{p.description}</div>
+      <div style={{marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#64748b",marginBottom:3}}><span>{dn}/{pj.length} {t.tasksDone}</span><span>{pct}%</span></div><div style={{height:6,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,background:pct===100?"#16a34a":"linear-gradient(90deg,#3b82f6,#7c3aed)",borderRadius:99}}/></div></div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><Avtr user={getUser(p.leader_id)} size={24} showName/><div style={{fontSize:11,color:"#94a3b8"}}>{t.due} {p.due_date}</div></div>
+      <div style={{display:"flex",gap:6}}>
+        <button onClick={()=>onSelectProj(p.id)} style={{...BS("#f8fafc"),flex:1,color:"#374151",border:"1px solid #e2e8f0",padding:"8px"}}>{t.viewJobs}</button>
+        {user.role==="leader"&&<><button onClick={()=>onEdit(p)} style={{...BS("#2563eb"),padding:"8px 11px",fontSize:12}}>{t.edit}</button><button onClick={()=>onDelete(p.id)} style={{...BS("#dc2626"),padding:"8px 11px",fontSize:12}}>{t.del}</button></>}
+      </div>
+    </div>;})}
+  </div>;
+}
+
+// ── TEAM PAGE ──────────────────────────────────────────────────
+function TeamPage({users,jobs,user,onAddUser,onEditUser,onDeleteUser,lang}){
+  const t=T[lang];
+  return <div style={{animation:"fadeUp 0.3s ease"}}>
+    <div style={{marginBottom:16,display:"flex",justifyContent:"flex-end"}}>
+      {user.role==="leader"&&<button onClick={onAddUser} style={BS("#059669")}>{t.addUser}</button>}
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:16}}>
+      {users.map(u=>{const my=jobs.filter(j=>j.assignee_id===u.id),dn=my.filter(j=>j.status==="done").length,ac=my.filter(j=>j.status==="in-progress").length,hrs=my.reduce((s,j)=>s+(Number(j.actual_hours)||0),0);
+      return <div key={u.id} style={{background:"#fff",borderRadius:14,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+          <div style={{width:46,height:46,borderRadius:"50%",background:u.role==="leader"?"linear-gradient(135deg,#3b82f6,#7c3aed)":"linear-gradient(135deg,#06b6d4,#10b981)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,color:"#fff"}}>{u.avatar||(u.name||"?")[0]}</div>
+          <div><div style={{fontWeight:700,color:"#0f172a",fontSize:14}}>{u.name}</div>{u.name_lao&&<div style={{fontSize:11,color:"#64748b"}}>{u.name_lao}</div>}<div style={{fontSize:11,color:u.role==="leader"?"#7c3aed":"#0891b2",fontWeight:700,textTransform:"uppercase"}}>{u.role==="leader"?t.leader:t.runner}</div></div>
+        </div>
+        <div style={{color:"#64748b",fontSize:12,marginBottom:10}}>📁 {u.department}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
+          {[["Total",my.length,"#2563eb"],["Done",dn,"#16a34a"],["Active",ac,"#f59e0b"]].map(([l,v,c])=><div key={l} style={{textAlign:"center",padding:"8px 4px",background:"#f8fafc",borderRadius:8}}><div style={{fontSize:18,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:10,color:"#94a3b8"}}>{l}</div></div>)}
+        </div>
+        <div style={{fontSize:11,color:"#64748b",borderTop:"1px solid #f1f5f9",paddingTop:8,marginBottom:user.role==="leader"?8:0}}>⏱ {hrs}h {t.hrsLogged}</div>
+        {user.role==="leader"&&<div style={{display:"flex",gap:6}}>
+          <button onClick={()=>onEditUser(u)} style={{...BS("#2563eb"),flex:1,padding:"6px",fontSize:11}}>{t.edit}</button>
+          {u.id!==user.id&&<button onClick={()=>onDeleteUser(u.id)} style={{...BS("#dc2626"),padding:"6px 10px",fontSize:11}}>{t.del}</button>}
+        </div>}
+      </div>;})}
+    </div>
+  </div>;
+}
+
+// ── MONTHLY JOBS PAGE ──────────────────────────────────────────
+function MonthlyPage({monthly,jobs,user,users,projects,getUser,onSaveTemplate,onDeleteTemplate,onGenerate,lang,generating}){
+  const t=T[lang];
+  const now=new Date(),y=now.getFullYear(),m=now.getMonth()+1;
+  const myTpls=monthly.filter(tp=>user.role==="leader"||String(tp.owner_id||tp.default_assignee_id)===String(user.id));
+  const thisMo=jobs.filter(j=>j.id&&j.id.startsWith("mj_")&&j.id.includes(`_${y}_${m}`)&&(user.role==="leader"||j.assignee_id===user.id)).sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9));
+  const isAct=tp=>tp.active===true||tp.active==="true"||tp.active===1||tp.active==="1";
+  const [modal,setModal]=useState(null);
+  return <div style={{animation:"fadeUp 0.3s ease"}}>
+    <div style={{background:"#fff",borderRadius:12,padding:18,marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+        <div><div style={{fontSize:16,fontWeight:700,color:"#0f172a"}}>📅 {lang==="lo"?"ວຽກປະຈໍາເດືອນ":"Monthly Routine Jobs"}</div><div style={{color:"#64748b",fontSize:13,marginTop:2}}>{lang==="lo"?"ສ້າງແມ່ແບບ — ວຽກຈະສ້າງອັດຕະໂນມັດວັນທີ 1 (ຄົບກໍານົດ T+10)":"Create templates — auto-generated on 1st of month, due T+10"}</div></div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>setModal({type:"add"})} style={BS("#2563eb")}>{t.addTemplate}</button>
+          {user.role==="leader"&&<button onClick={onGenerate} disabled={generating} style={{...BS("#059669"),opacity:generating?0.7:1}}>{generating?<><span className="spin">◌</span> ...</>:t.generateNow}</button>}
+        </div>
+      </div>
+      {thisMo.length>0&&<div style={{marginTop:12,padding:"10px 14px",background:"#f0fdf4",borderRadius:8,fontSize:13,color:"#15803d"}}>
+        ✅ {String(m).padStart(2,"0")}/{y}: <strong>{thisMo.filter(j=>j.status==="done").length}/{thisMo.length}</strong> {lang==="lo"?"ວຽກ":"jobs"} · Due {y}-{String(m).padStart(2,"0")}-11
+      </div>}
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+      <div style={{background:"#fff",borderRadius:12,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+        <div style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:14}}>📋 {lang==="lo"?"ແມ່ແບບຂອງຂ້ອຍ":"My Templates"} ({myTpls.length})</div>
+        {myTpls.length===0&&<div style={{color:"#94a3b8",fontSize:13,textAlign:"center",padding:"20px 0"}}>{lang==="lo"?"ຍັງບໍ່ມີ. ກົດ + ເພີ່ມ":"None yet. Click + Add Template"}</div>}
+        {myTpls.map(tp=><div key={tp.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #f1f5f9"}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:600,color:"#1e293b",fontSize:13,display:"flex",alignItems:"center",gap:7}}>{lang==="lo"&&tp.title_lao?tp.title_lao:tp.title}<span style={{fontSize:10,padding:"1px 6px",borderRadius:99,background:isAct(tp)?"#f0fdf4":"#f1f5f9",color:isAct(tp)?"#16a34a":"#94a3b8",fontWeight:700,flexShrink:0}}>{isAct(tp)?"Active":"Off"}</span></div>
+            <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{tp.category} · {tp.estimated_hours}h · <PriDot priority={tp.priority} lang={lang}/></div>
+          </div>
+          <div style={{display:"flex",gap:5,flexShrink:0,marginLeft:8}}>
+            <button onClick={()=>setModal({type:"edit",data:tp})} style={{...BS("#2563eb"),padding:"4px 9px",fontSize:11}}>{t.edit}</button>
+            <button onClick={()=>onDeleteTemplate(tp.id)} style={{...BS("#dc2626"),padding:"4px 9px",fontSize:11}}>{t.del}</button>
+          </div>
+        </div>)}
+        {user.role==="leader"&&monthly.filter(tp=>!myTpls.includes(tp)).length>0&&<>
+          <div style={{fontSize:12,fontWeight:700,color:"#94a3b8",margin:"14px 0 8px",textTransform:"uppercase",letterSpacing:0.5}}>Other Team Templates</div>
+          {monthly.filter(tp=>!myTpls.includes(tp)).map(tp=><div key={tp.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #f1f5f9",opacity:0.7}}>
+            <div><div style={{fontWeight:600,color:"#64748b",fontSize:12}}>{lang==="lo"&&tp.title_lao?tp.title_lao:tp.title}</div><Avtr user={getUser(tp.owner_id||tp.default_assignee_id)} size={13} showName/></div>
+            <span style={{fontSize:10,padding:"1px 6px",borderRadius:99,background:isAct(tp)?"#f0fdf4":"#f1f5f9",color:isAct(tp)?"#16a34a":"#94a3b8",fontWeight:700}}>{isAct(tp)?"Active":"Off"}</span>
+          </div>)}
+        </>}
+      </div>
+      <div style={{background:"#fff",borderRadius:12,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+        <div style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:14}}>🗓 {String(m).padStart(2,"0")}/{y} Jobs</div>
+        {thisMo.length===0&&<div style={{color:"#94a3b8",fontSize:13}}>{lang==="lo"?"ຍັງບໍ່ມີວຽກ. ວຽກຈະສ້າງວັນທີ 1 ອັດຕະໂນມັດ":"No jobs yet. Auto-generates on 1st of month."}</div>}
+        {thisMo.map(j=>{const od=new Date(j.due_date)<new Date()&&j.status!=="done";const pg=Number(j.progress)||0;return <div key={j.id} style={{padding:"10px 0",borderBottom:"1px solid #f1f5f9"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div style={{flex:1}}><div style={{fontWeight:600,color:"#1e293b",fontSize:13}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div><div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}><Badge status={j.status} lang={lang}/><PriDot priority={j.priority} lang={lang}/><Avtr user={getUser(j.assignee_id)} size={15} showName/>{od&&<span style={{fontSize:10,color:"#dc2626",fontWeight:700}}>⚠</span>}</div><div style={{display:"flex",alignItems:"center",gap:5,marginTop:5}}><div style={{flex:1,height:4,background:"#f1f5f9",borderRadius:99}}><div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":"#3b82f6",borderRadius:99}}/></div><span style={{fontSize:10,color:"#94a3b8"}}>{pg}%</span></div></div>
+            <div style={{fontSize:11,color:od?"#dc2626":"#94a3b8",marginLeft:10,whiteSpace:"nowrap"}}>{j.due_date}</div>
+          </div>
+        </div>;})}
+      </div>
+    </div>
+    {modal&&<TemplateModal initial={modal.data} onClose={()=>setModal(null)} onSave={data=>{onSaveTemplate(data,!modal.data);setModal(null);}} user={user} users={users} projects={projects} lang={lang}/>}
+  </div>;
+}
+
+function TemplateModal({initial,onClose,onSave,user,users,projects,lang}){
+  const t=T[lang];
+  const [f,setF]=useState(initial||{id:"",title:"",title_lao:"",description:"",project_id:projects[0]?.id||"",default_assignee_id:user.id,owner_id:user.id,priority:"high",category:"Month-End Close",estimated_hours:8,active:true});
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  return <Modal title={initial?(lang==="lo"?"ແກ້ໄຂແມ່ແບບ":"Edit Template"):(lang==="lo"?"ແມ່ແບບໃໝ່":"New Template")} onClose={onClose} onSave={()=>onSave(f)}>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (EN)"}><input value={f.title} onChange={e=>set("title",e.target.value)} style={IS}/></Lbl></div>
+      <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (ລາວ)"}><input value={f.title_lao||""} onChange={e=>set("title_lao",e.target.value)} style={IS}/></Lbl></div>
+      <div style={{gridColumn:"1/-1"}}><Lbl label={t.desc}><textarea value={f.description||""} onChange={e=>set("description",e.target.value)} style={{...IS,height:50,resize:"vertical"}}/></Lbl></div>
+      <Lbl label={t.category}><select value={f.category||""} onChange={e=>set("category",e.target.value)} style={IS}>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select></Lbl>
+      <Lbl label={t.priority}><select value={f.priority} onChange={e=>set("priority",e.target.value)} style={IS}>{Object.entries(PRIORITY).map(([k,v])=><option key={k} value={k}>{v[lang]||v.en}</option>)}</select></Lbl>
+      <Lbl label={t.project}><select value={f.project_id||""} onChange={e=>set("project_id",e.target.value)} style={IS}><option value="">-- None --</option>{projects.map(p=><option key={p.id} value={p.id}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</option>)}</select></Lbl>
+      <Lbl label={t.estHrs}><input type="number" min="1" value={f.estimated_hours||8} onChange={e=>set("estimated_hours",+e.target.value)} style={IS}/></Lbl>
+      {user.role==="leader"&&<div style={{gridColumn:"1/-1"}}><Lbl label={t.assignee+" (default)"}><select value={f.default_assignee_id||user.id} onChange={e=>set("default_assignee_id",e.target.value)} style={IS}>{users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Lbl></div>}
+      <div style={{gridColumn:"1/-1"}}><Lbl label={lang==="lo"?"ສະຖານະ":"Active (generate each month?)"}><div style={{display:"flex",gap:10}}>{[true,false].map(v=><button key={String(v)} type="button" onClick={()=>set("active",v)} style={{flex:1,padding:"9px",borderRadius:8,border:`2px solid ${f.active===v?"#2563eb":"#e2e8f0"}`,background:f.active===v?"#eff6ff":"#fff",color:f.active===v?"#2563eb":"#94a3b8",fontWeight:700,fontSize:13}}>{v?(lang==="lo"?"✓ ໃຊ້ງານ":"✓ Active"):(lang==="lo"?"✗ ປິດ":"✗ Off")}</button>)}</div></Lbl></div>
+    </div>
+  </Modal>;
+}
+
+// ── PENDING APPROVAL ───────────────────────────────────────────
+function PendingPage({pending,user,getUser,onApprove,onReject,lang}){
+  const t=T[lang];
+  const [rejectId,setRejectId]=useState(null);const [reason,setReason]=useState("");
+  const waiting=pending.filter(j=>!j.approval_status||j.approval_status==="pending");
+  return <div style={{animation:"fadeUp 0.3s ease"}}>
+    <div style={{background:"#fff",borderRadius:12,padding:16,marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}><div style={{fontSize:16,fontWeight:700,color:"#0f172a",marginBottom:2}}>📥 {lang==="lo"?"ລໍຄໍາອະນຸມັດ":"Pending Approvals"}</div><div style={{color:"#64748b",fontSize:13}}>{t.pendingDesc}</div></div>
+    {waiting.length===0&&<div style={{background:"#fff",borderRadius:12,padding:40,textAlign:"center",color:"#94a3b8",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>✅ {lang==="lo"?"ບໍ່ມີຄໍາຂໍ":"No pending requests"}</div>}
+    {waiting.map(j=><div key={j.id} style={{background:"#fff",borderRadius:12,padding:18,marginBottom:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderLeft:"4px solid #f59e0b"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
+        <div style={{flex:1}}><div style={{fontWeight:700,color:"#0f172a",fontSize:15}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div><div style={{color:"#64748b",fontSize:13,marginTop:3}}>{j.description}</div><div style={{display:"flex",gap:14,marginTop:8,flexWrap:"wrap"}}><span style={{fontSize:12,color:"#64748b"}}>📁 {j.category}</span><span style={{fontSize:12,color:"#64748b"}}>📅 {j.due_date}</span><PriDot priority={j.priority} lang={lang}/><span style={{fontSize:12,color:"#64748b"}}>By: <strong>{getUser(j.requested_by)?.name||j.requested_by}</strong></span></div></div>
+        {user.role==="leader"&&<div style={{display:"flex",gap:8}}><button onClick={()=>onApprove(j.id)} style={{...BS("#16a34a"),padding:"8px 16px"}}>✓ {t.approve}</button><button onClick={()=>{setRejectId(j.id);setReason("");}} style={{...BS("#dc2626"),padding:"8px 16px"}}>✕ {t.reject}</button></div>}
+        {user.role==="runner"&&<span style={{padding:"4px 12px",borderRadius:99,background:"#fef3c7",color:"#92400e",fontSize:12,fontWeight:700}}>⏳ Waiting</span>}
+      </div>
+    </div>)}
+    {pending.filter(j=>j.approval_status&&j.approval_status!=="pending").length>0&&<><div style={{fontSize:14,fontWeight:700,color:"#64748b",margin:"18px 0 8px"}}>Past Requests</div>{pending.filter(j=>j.approval_status&&j.approval_status!=="pending").map(j=><div key={j.id} style={{background:"#fff",borderRadius:10,padding:12,marginBottom:6,boxShadow:"0 1px 3px rgba(0,0,0,0.04)",opacity:0.75,borderLeft:`4px solid ${j.approval_status==="approved"?"#16a34a":"#dc2626"}`}}><div style={{display:"flex",justifyContent:"space-between"}}><div style={{fontWeight:600,color:"#374151"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div><span style={{fontSize:12,padding:"2px 10px",borderRadius:99,background:j.approval_status==="approved"?"#f0fdf4":"#fef2f2",color:j.approval_status==="approved"?"#16a34a":"#dc2626",fontWeight:700}}>{j.approval_status}</span></div>{j.reject_reason&&<div style={{fontSize:12,color:"#dc2626",marginTop:3}}>{j.reject_reason}</div>}</div>)}</>}
+    {rejectId&&<Modal title="Reject Request" onClose={()=>setRejectId(null)} onSave={()=>{onReject(rejectId,reason);setRejectId(null);}} saveLabel="Reject" saveColor="#dc2626"><Lbl label="Reason"><textarea value={reason} onChange={e=>setReason(e.target.value)} style={{...IS,height:80}} placeholder="Reason for rejection..."/></Lbl></Modal>}
+  </div>;
+}
+
+// ── TIMELINE PAGE ──────────────────────────────────────────────
+function TimelinePage({projects,jobs,getUser,lang}){
+  const t=T[lang];
+  const [selProj,setSelProj]=useState("all");
+  const now=new Date();
+
+  const visibleProjects=selProj==="all"?projects:projects.filter(p=>p.id===selProj);
+
+  // Calculate date range across all visible projects
+  const allDates=[...projects.flatMap(p=>[p.start_date,p.due_date]),...jobs.flatMap(j=>[j.start_date,j.due_date])].filter(Boolean).map(d=>new Date(d));
+  const minDate=allDates.length?new Date(Math.min(...allDates)):new Date();
+  const maxDate=allDates.length?new Date(Math.max(...allDates)):new Date(now.getFullYear(),now.getMonth()+3,1);
+  // Add padding
+  minDate.setDate(1);maxDate.setMonth(maxDate.getMonth()+1,1);
+  const totalDays=Math.max(1,Math.round((maxDate-minDate)/(1000*60*60*24)));
+
+  const pct=(d)=>{if(!d)return 0;const dd=new Date(d);return Math.max(0,Math.min(100,Math.round((dd-minDate)/((maxDate-minDate))*100)));};
+  const wid=(s,e)=>{if(!s||!e)return 0;const sd=new Date(s),ed=new Date(e);return Math.max(0.5,Math.round((ed-sd)/((maxDate-minDate))*100));};
+
+  // Build month headers
+  const months=[];let cur=new Date(minDate);
+  while(cur<maxDate){months.push({label:cur.toLocaleDateString(lang==="lo"?"lo-LA":"en-US",{month:"short",year:"2-digit"}),pct:pct(cur.toISOString().slice(0,10))});cur.setMonth(cur.getMonth()+1);}
+
+  const todayPct=pct(now.toISOString().slice(0,10));
+  const sc={active:"#2563eb",planning:"#7c3aed",completed:"#16a34a",paused:"#f59e0b"};
+
+  return <div style={{animation:"fadeUp 0.3s ease"}}>
+    <div style={{background:"#fff",borderRadius:12,padding:"14px 18px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+      <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>📊 {lang==="lo"?"ເສັ້ນທາງເວລາໂຄງການ":"Project Timeline"}</div>
+      <select value={selProj} onChange={e=>setSelProj(e.target.value)} style={{...SS,minWidth:180}}>
+        <option value="all">{t.allProjects}</option>
+        {projects.map(p=><option key={p.id} value={p.id}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</option>)}
+      </select>
+      <div style={{marginLeft:"auto",display:"flex",gap:12,fontSize:12,color:"#64748b",flexWrap:"wrap"}}>
+        {Object.entries({active:"#2563eb",planning:"#7c3aed",completed:"#16a34a",paused:"#f59e0b"}).map(([k,c])=><span key={k} style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:10,height:10,borderRadius:2,background:c,display:"inline-block"}}/>{k}</span>)}
+      </div>
+    </div>
+
+    <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+      {/* Month headers */}
+      <div style={{display:"flex",borderBottom:"2px solid #e8edf5",position:"relative",paddingLeft:220}}>
+        {months.map((mo,i)=><div key={i} style={{position:"absolute",left:`calc(220px + ${mo.pct}%)`,fontSize:10,color:"#94a3b8",fontWeight:600,paddingTop:6,paddingBottom:6,paddingLeft:4,borderLeft:"1px dashed #e8edf5",whiteSpace:"nowrap"}}>{mo.label}</div>)}
+        <div style={{height:28,flex:1}}/>
+      </div>
+      {/* Today line reference */}
+      <div style={{padding:"0 0 0 220px",position:"relative",minHeight:20}}>
+        <div style={{position:"absolute",left:`calc(220px + ${todayPct}%)`,top:0,bottom:0,width:2,background:"#ef4444",opacity:0.7,zIndex:5,pointerEvents:"none"}}/>
+      </div>
+
+      {visibleProjects.map(p=>{
+        const pJobs=jobs.filter(j=>j.project_id===p.id);
+        const dn=pJobs.filter(j=>j.status==="done").length;
+        const projPct=pJobs.length?Math.round((dn/pJobs.length)*100):0;
+        const barLeft=pct(p.start_date);const barW=wid(p.start_date,p.due_date);
+        return <div key={p.id}>
+          {/* Project row */}
+          <div style={{display:"flex",alignItems:"center",borderBottom:"1px solid #f1f5f9",background:"#f8fafc"}}>
+            <div style={{width:220,flexShrink:0,padding:"10px 14px"}}>
+              <div style={{fontWeight:700,color:"#0f172a",fontSize:13}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div>
+              <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>{dn}/{pJobs.length} {t.tasksDone} · {projPct}%</div>
+            </div>
+            <div style={{flex:1,position:"relative",height:44,overflow:"hidden"}}>
+              <div style={{position:"absolute",left:`${barLeft}%`,width:`${barW}%`,top:10,height:24,borderRadius:6,background:sc[p.status]||"#94a3b8",display:"flex",alignItems:"center",justifyContent:"center",minWidth:4,boxShadow:"0 1px 3px rgba(0,0,0,0.15)"}}>
+                {barW>8&&<div style={{position:"absolute",inset:0,background:"rgba(255,255,255,0.25)",borderRadius:6,width:`${projPct}%`}}/>}
+                {barW>12&&<span style={{position:"relative",fontSize:10,color:"#fff",fontWeight:700,whiteSpace:"nowrap",padding:"0 6px"}}>{projPct}%</span>}
+              </div>
+            </div>
+          </div>
+          {/* Job rows */}
+          {pJobs.sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>{
+            const jLeft=pct(j.start_date);const jW=wid(j.start_date,j.due_date);
+            const od=new Date(j.due_date)<now&&j.status!=="done";
+            const jColor=j.status==="done"?"#16a34a":od?"#dc2626":STATUS[j.status]?.c||"#64748b";
+            const pg=Number(j.progress)||0;
+            return <div key={j.id} style={{display:"flex",alignItems:"center",borderBottom:"1px solid #f8fafc"}}>
+              <div style={{width:220,flexShrink:0,padding:"7px 14px 7px 26px"}}>
+                <div style={{fontSize:12,color:"#374151",fontWeight:500}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+                <div style={{display:"flex",alignItems:"center",gap:5,marginTop:2}}><Badge status={j.status} lang={lang}/><Avtr user={getUser(j.assignee_id)} size={14}/></div>
+              </div>
+              <div style={{flex:1,position:"relative",height:36,overflow:"hidden"}}>
+                <div style={{position:"absolute",left:`${jLeft}%`,width:`${Math.max(jW,0.8)}%`,top:8,height:20,borderRadius:4,background:jColor+"22",border:`1.5px solid ${jColor}`,minWidth:4,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${pg}%`,background:jColor,opacity:0.5,borderRadius:3}}/>
+                </div>
+                {jW>6&&<div style={{position:"absolute",left:`calc(${jLeft}% + 4px)`,top:9,fontSize:10,color:jColor,fontWeight:700,whiteSpace:"nowrap"}}>{j.title?.slice(0,20)}{j.title?.length>20?"…":""}</div>}
+              </div>
+            </div>;})}
+        </div>;})}
+      {visibleProjects.length===0&&<div style={{textAlign:"center",padding:40,color:"#94a3b8"}}>{lang==="lo"?"ບໍ່ມີໂຄງການ":"No projects found"}</div>}
+      {/* Today marker label */}
+      <div style={{paddingLeft:220,position:"relative",height:20}}>
+        <div style={{position:"absolute",left:`calc(220px + ${todayPct}% - 16px)`,bottom:2,fontSize:9,color:"#ef4444",fontWeight:700,whiteSpace:"nowrap"}}>TODAY</div>
+      </div>
+    </div>
+  </div>;
+}
+
+// ── REPORTS PAGE ───────────────────────────────────────────────
+function ReportsPage({jobs,projects,users,user,getUser,lang}){
+  const t=T[lang];
+  const [tab,setTab]=useState("personal");
+  const [period,setPeriod]=useState("month"); // week|month|quarter|year|all
+  const now=new Date();
+
+  // Period filter
+  const periodStart=useMemo(()=>{
+    const d=new Date();
+    if(period==="week"){d.setDate(d.getDate()-7);}
+    else if(period==="month"){d.setDate(1);}
+    else if(period==="quarter"){d.setMonth(Math.floor(d.getMonth()/3)*3,1);}
+    else if(period==="year"){d.setMonth(0,1);}
+    else{return new Date(0);}
+    d.setHours(0,0,0,0);return d;
+  },[period]);
+
+  const inPeriod=j=>{
+    const u=new Date(String(j.updated_at||j.created_at||"").slice(0,10));
+    return u>=periodStart;
+  };
+
+  // ── Helpers ────────────────────────────────────────────────
+  const pct=(a,b)=>b?Math.round(a/b*100):0;
+  const avgNum=arr=>arr.length?Math.round(arr.reduce((s,v)=>s+v,0)/arr.length):0;
+
+  // Stat card component
+  const StatCard=({label,value,sub,color="#2563eb",icon})=>(
+    <div style={{background:"#fff",borderRadius:12,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`3px solid ${color}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.4,marginBottom:3}}>{label}</div>
+          <div style={{fontSize:28,fontWeight:800,color:"#0f172a"}}>{value}</div>
+          {sub&&<div style={{fontSize:11,color:"#64748b",marginTop:3}}>{sub}</div>}
+        </div>
+        <div style={{width:38,height:38,borderRadius:10,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color}}>{icon}</div>
+      </div>
+    </div>
+  );
+
+  // Mini bar chart
+  const BarChart=({data,height=80,color="#3b82f6"})=>{
+    const max=Math.max(...data.map(d=>d.v),1);
+    return <div style={{display:"flex",alignItems:"flex-end",gap:3,height,paddingTop:4}}>
+      {data.map((d,i)=>(
+        <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+          <div style={{fontSize:9,color:"#94a3b8",fontWeight:600}}>{d.v||""}</div>
+          <div style={{width:"100%",background:color,borderRadius:"3px 3px 0 0",height:`${Math.max(4,Math.round(d.v/max*(height-20)))}px`,transition:"height 0.4s ease"}}/>
+          <div style={{fontSize:9,color:"#94a3b8",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%",textAlign:"center"}}>{d.l}</div>
+        </div>
+      ))}
+    </div>;
+  };
+
+  // Donut chart (simple SVG)
+  const Donut=({segments,size=80})=>{
+    const total=segments.reduce((s,sg)=>s+sg.v,0)||1;
+    let offset=0;
+    const r=30,cx=40,cy=40,circ=2*Math.PI*r;
+    return <svg width={size} height={size} viewBox="0 0 80 80">
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f1f5f9" strokeWidth="12"/>
+      {segments.filter(sg=>sg.v>0).map((sg,i)=>{
+        const dash=circ*(sg.v/total);
+        const el=<circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={sg.c} strokeWidth="12"
+          strokeDasharray={`${dash} ${circ-dash}`} strokeDashoffset={-offset*circ/total}
+          transform="rotate(-90 40 40)" strokeLinecap="butt"/>;
+        offset+=sg.v;return el;
+      })}
+    </svg>;
+  };
+
+  // ── PDF export ─────────────────────────────────────────────
+  const exportReport=(title,html)=>{
+    const win=window.open("","_blank");
+    win.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
+    <style>
+      body{font-family:'Segoe UI',sans-serif;padding:28px;color:#1e293b;font-size:12px;}
+      h1{font-size:20px;color:#0f172a;margin-bottom:4px;}
+      h2{font-size:14px;color:#374151;margin:18px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;}
+      .meta{color:#64748b;font-size:11px;margin-bottom:20px;}
+      table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+      th{background:#0f172a;color:#fff;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;}
+      td{padding:7px 10px;border-bottom:1px solid #e2e8f0;}
+      tr:nth-child(even){background:#f8fafc;}
+      .badge{padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;}
+      .done{background:#f0fdf4;color:#16a34a;}.in-progress{background:#eff6ff;color:#2563eb;}
+      .todo{background:#f1f5f9;color:#64748b;}.blocked{background:#fef2f2;color:#dc2626;}
+      .stat-grid{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;}
+      .stat{background:#f8fafc;border-radius:8px;padding:10px 14px;flex:1;min-width:100px;border-top:3px solid #3b82f6;}
+      .stat .n{font-size:22px;font-weight:800;color:#0f172a;}
+      .stat .l{font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:600;}
+      @media print{body{padding:14px;}}
+    </style></head><body>${html}</body></html>`);
+    win.document.close();
+    setTimeout(()=>win.print(),500);
+  };
+
+  // ── TAB: PERSONAL ──────────────────────────────────────────
+  const PersonalReport=()=>{
+    const myAll=jobs.filter(j=>j.assignee_id===user.id);
+    const my=myAll.filter(inPeriod);
+    const done=my.filter(j=>j.status==="done");
+    const inProg=my.filter(j=>j.status==="in-progress");
+    const blocked=my.filter(j=>j.status==="blocked");
+    const overdue=my.filter(j=>new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done");
+    const estTotal=my.reduce((s,j)=>s+(Number(j.estimated_hours)||0),0);
+    const actTotal=my.reduce((s,j)=>s+(Number(j.actual_hours)||0),0);
+    const avgProg=avgNum(my.map(j=>Number(j.progress)||0));
+    const efficiency=estTotal?Math.round(estTotal/Math.max(actTotal,1)*100):100;
+    const onTime=done.filter(j=>!j.due_date||new Date(String(j.due_date).slice(0,10))>=new Date(String(j.updated_at||j.created_at||"").slice(0,10)));
+
+    // Category breakdown
+    const catMap={};myAll.forEach(j=>{if(!catMap[j.category||"Other"])catMap[j.category||"Other"]=0;catMap[j.category||"Other"]++;});
+    const catData=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([l,v])=>({l:l.split(" ").slice(0,2).join(" "),v}));
+
+    // Priority breakdown
+    const priBreak=Object.entries(PRIORITY).map(([k,v])=>({l:v.en,v:my.filter(j=>j.priority===k).length,c:v.c}));
+
+    const printReport=()=>{
+      // Group jobs by project for the PDF
+      const grouped2={};
+      my.forEach(j=>{const k=j.project_id||"__none__";if(!grouped2[k])grouped2[k]=[];grouped2[k].push(j);});
+      const projSections=Object.entries(grouped2).map(([pid,pjobs])=>{
+        const projName=projects.find(p=>p.id===pid)?.name||"No Project";
+        const rows=pjobs.sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>`
+          <tr>
+            <td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>${j.notes?`<div style="font-size:10px;color:#64748b;margin-top:3px">${j.notes}</div>`:""}</td>
+            <td><span class="badge ${j.status}">${STATUS[j.status]?.en||j.status}</span></td>
+            <td class="p ${j.priority}">${j.priority}</td>
+            <td>${cleanDate(j.due_date)}</td>
+            <td>${j.progress||0}%</td>
+          </tr>`).join("");
+        return `<h2>${projName}</h2>
+          <table><thead><tr><th>Job / Notes</th><th>Status</th><th>Priority</th><th>Due</th><th>Progress</th></tr></thead>
+          <tbody>${rows}</tbody></table>`;
+      }).join("");
+      exportReport(`Personal Report — ${user.name}`,`
+        <h1>📋 Personal Performance Report</h1>
+        <div class="meta">Period: ${period.toUpperCase()} · Employee: <strong>${user.name}</strong> · Department: ${user.department} · Generated: ${now.toLocaleDateString()}</div>
+        <div class="stat-grid">
+          <div class="stat" style="border-color:#2563eb"><div class="n">${my.length}</div><div class="l">Total Jobs</div></div>
+          <div class="stat" style="border-color:#16a34a"><div class="n">${done.length}</div><div class="l">Completed</div></div>
+          <div class="stat" style="border-color:#f59e0b"><div class="n">${avgProg}%</div><div class="l">Avg Progress</div></div>
+          <div class="stat" style="border-color:#dc2626"><div class="n">${overdue.length}</div><div class="l">Overdue</div></div>
+          <div class="stat" style="border-color:#059669"><div class="n">${done.length?pct(onTime.length,done.length):0}%</div><div class="l">On-Time Rate</div></div>
+        </div>
+        ${projSections}
+      `);
+    };
+
+    return <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{lang==="lo"?"ລາຍງານສ່ວນຕົວ":"Personal Performance"} — {user.name}</div>
+        <button onClick={printReport} style={{...BS("#dc2626"),padding:"7px 16px",fontSize:13}}>↓ PDF</button>
+      </div>
+      {/* KPI Cards */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:12,marginBottom:20}}>
+        <StatCard label={lang==="lo"?"ວຽກທັງໝົດ":"Total Jobs"} value={my.length} color="#2563eb" icon="📋"/>
+        <StatCard label={lang==="lo"?"ສໍາເລັດ":"Done"} value={done.length} sub={`${pct(done.length,my.length)}% rate`} color="#16a34a" icon="✓"/>
+        <StatCard label={lang==="lo"?"ຄວາມຄືບໜ້າ":"Avg Progress"} value={`${avgProg}%`} color="#7c3aed" icon="◑"/>
+        <StatCard label={lang==="lo"?"ຊມ ລວມ":"Hours Logged"} value={`${actTotal}h`} sub={`of ${estTotal}h est.`} color="#f59e0b" icon="⏱"/>
+        <StatCard label={lang==="lo"?"ເກີນກໍານົດ":"Overdue"} value={overdue.length} color="#dc2626" icon="⚠"/>
+        <StatCard label={lang==="lo"?"ຕົງເວລາ":"On Time"} value={done.length?`${pct(onTime.length,done.length)}%`:"—"} color="#059669" icon="🎯"/>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 240px",gap:16,marginBottom:16}}>
+        {/* Jobs by category bar */}
+        <div style={{background:"#fff",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:12}}>📁 {lang==="lo"?"ວຽກຕາມປະເພດ":"Jobs by Category"}</div>
+          {catData.length?<BarChart data={catData} color="#3b82f6" height={100}/>:<div style={{color:"#94a3b8",fontSize:12,textAlign:"center",padding:20}}>No data</div>}
+        </div>
+        {/* Status breakdown */}
+        <div style={{background:"#fff",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:12}}>📊 {lang==="lo"?"ສະຖານະ":"Status Breakdown"}</div>
+          <div style={{display:"flex",alignItems:"center",gap:16}}>
+            <Donut segments={Object.entries(STATUS).map(([k,v])=>({v:my.filter(j=>j.status===k).length,c:v.c}))} size={80}/>
+            <div style={{flex:1}}>
+              {Object.entries(STATUS).map(([k,v])=>{const n=my.filter(j=>j.status===k).length;return n>0&&<div key={k} style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
+                <div style={{width:10,height:10,borderRadius:2,background:v.c,flexShrink:0}}/>
+                <span style={{fontSize:12,color:"#374151",flex:1}}>{v[lang]||v.en}</span>
+                <span style={{fontSize:12,fontWeight:700,color:v.c}}>{n}</span>
+              </div>;})}
+            </div>
+          </div>
+        </div>
+        {/* Priority donut */}
+        <div style={{background:"#fff",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:12}}>🎯 {lang==="lo"?"ລະດັບ":"Priority"}</div>
+          <Donut segments={priBreak} size={70}/>
+          <div style={{marginTop:6}}>
+            {priBreak.filter(p=>p.v>0).map(p=><div key={p.l} style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#64748b",marginBottom:2}}>
+              <span>{p.l}</span><span style={{fontWeight:700,color:p.c}}>{p.v}</span>
+            </div>)}
+          </div>
+        </div>
+      </div>
+
+      {/* Overdue + Blocked alerts */}
+      {(overdue.length>0||blocked.length>0)&&<div style={{background:"#fef2f2",borderRadius:12,padding:16,marginBottom:16,border:"1px solid #fecaca"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#dc2626",marginBottom:8}}>⚠ {lang==="lo"?"ຕ້ອງການຄວາມສົນໃຈ":"Needs Attention"} ({overdue.length+blocked.length})</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {[...overdue,...blocked].map(j=><div key={j.id} style={{background:"#fff",borderRadius:8,padding:"7px 12px",border:"1px solid #fca5a5",fontSize:12}}>
+            <span style={{fontWeight:600,color:"#1e293b"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</span>
+            <span style={{marginLeft:6,fontSize:11,color:"#dc2626"}}>{j.status==="blocked"?"Blocked":"⚠ "+cleanDate(j.due_date)}</span>
+          </div>)}
+        </div>
+      </div>}
+
+      {/* Job list - grouped by project, no hours, show notes */}
+      <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+        <div style={{padding:"12px 16px",borderBottom:"1px solid #f1f5f9",fontSize:13,fontWeight:700,color:"#0f172a"}}>{lang==="lo"?"ລາຍລະອຽດວຽກ":"Job Details"} ({my.length})</div>
+        {Object.entries(my.reduce((acc,j)=>{const k=j.project_id||"__none__";if(!acc[k])acc[k]=[];acc[k].push(j);return acc;},{})).map(([pid,pjobs])=>{
+          const pname=projects.find(p=>p.id===pid)?.name||(lang==="lo"?"ບໍ່ມີໂຄງການ":"No Project");
+          return <div key={pid}>
+            <div style={{padding:"8px 16px",background:"#f0f4f8",borderBottom:"1px solid #e8edf5",fontSize:12,fontWeight:700,color:"#374151"}}>📂 {pname}</div>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead><tr style={{background:"#f8fafc"}}>{["Job / Notes","Category","Status","Priority","Due","%"].map(h=><th key={h} style={{textAlign:"left",padding:"8px 12px",color:"#64748b",fontWeight:700,fontSize:10,textTransform:"uppercase",borderBottom:"1px solid #e8edf5"}}>{h}</th>)}</tr></thead>
+              <tbody>
+                {pjobs.sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>{const od=new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done";const pg=Number(j.progress)||0;
+                return <tr key={j.id} style={{borderBottom:"1px solid #f8fafc"}} onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"} onMouseLeave={e=>e.currentTarget.style.background=""}>
+                  <td style={{padding:"9px 12px",maxWidth:260}}>
+                    <div style={{fontWeight:600,color:"#1e293b"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+                    {j.notes&&<div style={{fontSize:11,color:"#64748b",marginTop:2,fontStyle:"italic",borderLeft:"2px solid #e2e8f0",paddingLeft:6}}>{j.notes}</div>}
+                  </td>
+                  <td style={{padding:"9px 12px"}}><span style={{fontSize:10,padding:"1px 7px",borderRadius:99,background:"#f0f9ff",color:"#0369a1",fontWeight:600}}>{j.category||"—"}</span></td>
+                  <td style={{padding:"9px 12px"}}><Badge status={j.status} lang={lang}/></td>
+                  <td style={{padding:"9px 12px"}}><PriDot priority={j.priority} lang={lang}/></td>
+                  <td style={{padding:"9px 12px",color:od?"#dc2626":"#64748b",fontSize:11,fontWeight:od?700:400,whiteSpace:"nowrap"}}>{od?"⚠ ":""}{cleanDate(j.due_date)}</td>
+                  <td style={{padding:"9px 12px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <div style={{width:50,height:4,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":"#3b82f6",borderRadius:99}}/></div>
+                      <span style={{fontSize:11,color:"#64748b"}}>{pg}%</span>
+                    </div>
+                  </td>
+                </tr>;})}
+              </tbody>
+            </table>
+          </div>;
+        })}
+      </div>
+    </div>;
+  };
+
+  // ── TAB: TEAM ──────────────────────────────────────────────
+  const TeamReport=()=>{
+    const [fTeamUser,setFTeamUser]=useState("all");
+    const baseJobs=period==="all"?jobs:jobs.filter(inPeriod);
+    const pJobs=fTeamUser==="all"?baseJobs:baseJobs.filter(j=>j.assignee_id===fTeamUser);
+    const totalDone=pJobs.filter(j=>j.status==="done").length;
+    const totalOverdue=pJobs.filter(j=>new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done").length;
+    const totalHrs=pJobs.reduce((s,j)=>s+(Number(j.actual_hours)||0),0);
+    const totalEst=pJobs.reduce((s,j)=>s+(Number(j.estimated_hours)||0),0);
+
+    const staffStats=users.map(u=>{
+      const uj=pJobs.filter(j=>j.assignee_id===u.id);
+      const udone=uj.filter(j=>j.status==="done");
+      const uod=uj.filter(j=>new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done");
+      const avgPg=avgNum(uj.map(j=>Number(j.progress)||0));
+      return {u,total:uj.length,done:udone.length,overdue:uod.length,avgPg,compRate:pct(udone.length,uj.length)};
+    }).filter(s=>s.total>0).sort((a,b)=>b.compRate-a.compRate);
+
+    const projStats=projects.map(p=>{
+      const pj=pJobs.filter(j=>j.project_id===p.id);
+      const pd=pj.filter(j=>j.status==="done");
+      return {p,total:pj.length,done:pd.length,pct:pct(pd.length,pj.length)};
+    }).filter(s=>s.total>0);
+
+    const catHeat={};pJobs.forEach(j=>{const c=j.category||"Other";if(!catHeat[c])catHeat[c]={total:0,done:0};catHeat[c].total++;if(j.status==="done")catHeat[c].done++;});
+    const catArr=Object.entries(catHeat).sort((a,b)=>b[1].total-a[1].total).slice(0,8);
+
+    const printReport=()=>{
+      const staffRows=staffStats.map(s=>`<tr><td>${s.u.name}</td><td>${s.u.department}</td><td>${s.total}</td><td>${s.done}</td><td>${s.compRate}%</td><td>${s.overdue}</td><td>${s.avgPg}%</td></tr>`).join("");
+      // Per-project sections with jobs
+      const projSections=projects.map(p=>{
+        const pj=pJobs.filter(j=>j.project_id===p.id);
+        if(!pj.length)return "";
+        const dn=pj.filter(j=>j.status==="done").length;
+        const rows=pj.sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>`
+          <tr>
+            <td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>${j.notes?`<div style="font-size:10px;color:#64748b;margin-top:2px;font-style:italic">${j.notes}</div>`:""}</td>
+            <td>${getUser(j.assignee_id)?.name||"—"}</td>
+            <td><span class="badge ${j.status}">${STATUS[j.status]?.en||j.status}</span></td>
+            <td class="p ${j.priority}">${j.priority}</td>
+            <td>${cleanDate(j.due_date)}</td>
+            <td>${j.progress||0}%</td>
+          </tr>`).join("");
+        return `<h2 style="border-left:4px solid #2563eb;padding-left:10px;margin-top:22px">${lang==="lo"&&p.name_lao?p.name_lao:p.name} <span style="font-size:11px;color:#64748b;font-weight:400">${dn}/${pj.length} done · ${pct(dn,pj.length)}%</span></h2>
+          <table><thead><tr><th>Job / Notes</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due</th><th>%</th></tr></thead><tbody>${rows}</tbody></table>`;
+      }).join("");
+      const filterNote=fTeamUser!=="all"?` · Staff: ${users.find(u=>u.id===fTeamUser)?.name||""}`:"";
+      exportReport("Team Report",`
+        <h1>👥 Team Work Report</h1>
+        <div class="meta">Period: ${period.toUpperCase()}${filterNote} · Manager: <strong>${user.name}</strong> · Generated: ${now.toLocaleDateString()}</div>
+        <div class="stat-grid">
+          <div class="stat" style="border-color:#2563eb"><div class="n">${pJobs.length}</div><div class="l">Total Jobs</div></div>
+          <div class="stat" style="border-color:#16a34a"><div class="n">${totalDone}</div><div class="l">Completed</div></div>
+          <div class="stat" style="border-color:#7c3aed"><div class="n">${pct(totalDone,pJobs.length)}%</div><div class="l">Completion Rate</div></div>
+          <div class="stat" style="border-color:#dc2626"><div class="n">${totalOverdue}</div><div class="l">Overdue</div></div>
+          <div class="stat" style="border-color:#059669"><div class="n">${staffStats.length}</div><div class="l">Active Staff</div></div>
+        </div>
+        <h2>Staff Summary</h2>
+        <table><thead><tr><th>Name</th><th>Dept</th><th>Jobs</th><th>Done</th><th>Rate</th><th>Overdue</th><th>Avg%</th></tr></thead><tbody>${staffRows}</tbody></table>
+        ${projSections}
+      `);
+    };
+
+    return <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
+        <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{lang==="lo"?"ລາຍງານທີມ":"Team Performance Report"}</div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <select value={fTeamUser} onChange={e=>setFTeamUser(e.target.value)}
+            style={{...SS,minWidth:140,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+            <option value="all">{lang==="lo"?"ທຸກຄົນ":"All Staff"}</option>
+            {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+          <button onClick={printReport} style={{...BS("#dc2626"),padding:"7px 16px",fontSize:13}}>↓ PDF</button>
+        </div>
+      </div>
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:18}}>
+        <StatCard label="Total Jobs" value={pJobs.length} color="#2563eb" icon="📋"/>
+        <StatCard label="Completed" value={totalDone} sub={`${pct(totalDone,pJobs.length)}%`} color="#16a34a" icon="✓"/>
+        <StatCard label="In Progress" value={pJobs.filter(j=>j.status==="in-progress").length} color="#f59e0b" icon="◑"/>
+        <StatCard label="Overdue" value={totalOverdue} color="#dc2626" icon="⚠"/>
+        <StatCard label="Active Staff" value={staffStats.length} color="#059669" icon="👥"/>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+        {/* Staff performance table */}
+        <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+          <div style={{padding:"12px 16px",borderBottom:"1px solid #f1f5f9",fontSize:13,fontWeight:700,color:"#0f172a"}}>👤 {lang==="lo"?"ປະສິດທິພາບ":"Staff"}</div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{background:"#f8fafc"}}>{["Name","Total","Done","%","OD"].map(h=><th key={h} style={{textAlign:"left",padding:"8px 12px",color:"#64748b",fontWeight:700,fontSize:10,textTransform:"uppercase",borderBottom:"1px solid #e8edf5"}}>{h}</th>)}</tr></thead>
+            <tbody>
+              {staffStats.map(s=><tr key={s.u.id} style={{borderBottom:"1px solid #f8fafc"}}>
+                <td style={{padding:"9px 12px"}}><Avtr user={s.u} size={22} showName/></td>
+                <td style={{padding:"9px 12px",fontWeight:600,color:"#1e293b"}}>{s.total}</td>
+                <td style={{padding:"9px 12px",color:"#16a34a",fontWeight:600}}>{s.done}</td>
+                <td style={{padding:"9px 12px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:4}}>
+                    <div style={{width:40,height:4,background:"#f1f5f9",borderRadius:99}}><div style={{height:"100%",width:`${s.compRate}%`,background:s.compRate>=80?"#16a34a":s.compRate>=50?"#f59e0b":"#dc2626",borderRadius:99}}/></div>
+                    <span style={{fontSize:11,color:"#64748b"}}>{s.compRate}%</span>
+                  </div>
+                </td>
+                <td style={{padding:"9px 12px",color:s.overdue>0?"#dc2626":"#94a3b8",fontWeight:s.overdue>0?700:400}}>{s.overdue||"—"}</td>
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
+        {/* Project progress */}
+        <div style={{background:"#fff",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:14}}>📂 {lang==="lo"?"ຄວາມຄືບໜ້າໂຄງການ":"Project Progress"}</div>
+          {projStats.map(s=>{const sc2={active:"#2563eb",planning:"#7c3aed",completed:"#16a34a",paused:"#f59e0b"};return <div key={s.p.id} style={{marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+              <div style={{fontWeight:600,color:"#1e293b",fontSize:12}}>{s.p.name}</div>
+              <div style={{fontSize:11,color:"#64748b"}}>{s.done}/{s.total} · {s.pct}%</div>
+            </div>
+            <div style={{height:6,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${s.pct}%`,background:sc2[s.p.status]||"#3b82f6",borderRadius:99,transition:"width 0.6s"}}/></div>
+          </div>;})}
+        </div>
+      </div>
+
+      {/* Category heatmap */}
+      <div style={{background:"#fff",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:14}}>🔥 {lang==="lo"?"ໂຖໂດຍໝວດ":"Workload by Category"}</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+          {catArr.map(([cat,data])=>{const cr=pct(data.done,data.total);const heat=cr>=80?"#dcfce7":cr>=50?"#fef3c7":"#fee2e2";
+          return <div key={cat} style={{background:heat,borderRadius:8,padding:"10px 12px",border:`1px solid ${cr>=80?"#bbf7d0":cr>=50?"#fde68a":"#fecaca"}`}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#1e293b",marginBottom:3}}>{cat}</div>
+            <div style={{fontSize:11,color:"#64748b"}}>{data.done}/{data.total} · {cr}%</div>
+          </div>;})}
+        </div>
+      </div>
+    </div>;
+  };
+
+  // ── TAB: OVERDUE & RISK ────────────────────────────────────
+  const RiskReport=()=>{
+    const overdueAll=jobs.filter(j=>new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done").sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9));
+    const blocked=jobs.filter(j=>j.status==="blocked");
+    const stale=jobs.filter(j=>{
+      if(j.status==="done"||j.status==="todo")return false;
+      const upd=new Date(String(j.updated_at||j.created_at||"").slice(0,10));
+      const diff=Math.round((now-upd)/(1000*60*60*24));
+      return diff>7;
+    });
+    const noProgress=jobs.filter(j=>j.status==="in-progress"&&(Number(j.progress)||0)===0);
+
+    const printReport=()=>{
+      const odRows=overdueAll.map(j=>`<tr>
+        <td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>${j.notes?`<div style="font-size:10px;color:#64748b;margin-top:2px;font-style:italic">${j.notes}</div>`:""}</td>
+        <td>${getUser(j.assignee_id)?.name||"?"}</td>
+        <td>${projects.find(p=>p.id===j.project_id)?.name||"—"}</td>
+        <td class="p ${j.priority}">${j.priority}</td>
+        <td style="color:#dc2626">${cleanDate(j.due_date)}</td>
+        <td>${j.status}</td>
+      </tr>`).join("");
+      exportReport("Risk & Overdue Report",`
+        <h1>⚠ Risk & Overdue Report</h1>
+        <div class="meta">Generated: ${now.toLocaleDateString()} · Manager: ${user.name}</div>
+        <div class="stat-grid">
+          <div class="stat" style="border-color:#dc2626"><div class="n">${overdueAll.length}</div><div class="l">Overdue</div></div>
+          <div class="stat" style="border-color:#f59e0b"><div class="n">${blocked.length}</div><div class="l">Blocked</div></div>
+          <div class="stat" style="border-color:#7c3aed"><div class="n">${stale.length}</div><div class="l">No Update 7d+</div></div>
+          <div class="stat" style="border-color:#64748b"><div class="n">${noProgress.length}</div><div class="l">0% Progress</div></div>
+        </div>
+        <h2>Overdue Jobs</h2>
+        <table><thead><tr><th>Job / Notes</th><th>Assignee</th><th>Project</th><th>Priority</th><th>Due</th><th>Status</th></tr></thead><tbody>${odRows}</tbody></table>
+      `);
+    };
+
+    const RiskTable=({title,items,emptyMsg,color="#dc2626"})=><div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden",marginBottom:14}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{title}</div>
+        <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,background:color+"18",color,fontWeight:700}}>{items.length}</span>
+      </div>
+      {items.length===0?<div style={{padding:20,textAlign:"center",color:"#94a3b8",fontSize:12}}>✅ {emptyMsg}</div>:
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+        <thead><tr style={{background:"#f8fafc"}}>{["Job / Notes","Project","Assignee","Priority","Due"].map(h=><th key={h} style={{textAlign:"left",padding:"8px 12px",color:"#64748b",fontWeight:700,fontSize:10,textTransform:"uppercase",borderBottom:"1px solid #e8edf5"}}>{h}</th>)}</tr></thead>
+        <tbody>{items.map(j=>{const od=new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done";const proj=projects.find(p=>p.id===j.project_id);
+        return <tr key={j.id} style={{borderBottom:"1px solid #f8fafc"}}>
+          <td style={{padding:"9px 12px",maxWidth:220}}>
+            <div style={{fontWeight:600,color:"#1e293b"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+            {j.notes&&<div style={{fontSize:11,color:"#64748b",marginTop:2,fontStyle:"italic",borderLeft:"2px solid #e2e8f0",paddingLeft:5}}>{j.notes}</div>}
+          </td>
+          <td style={{padding:"9px 12px",color:"#64748b",fontSize:11}}>{proj?.name||"—"}</td>
+          <td style={{padding:"9px 12px"}}><Avtr user={getUser(j.assignee_id)} size={20} showName/></td>
+          <td style={{padding:"9px 12px"}}><PriDot priority={j.priority} lang={lang}/></td>
+          <td style={{padding:"9px 12px",color:od?"#dc2626":"#94a3b8",fontSize:11,fontWeight:od?700:400,whiteSpace:"nowrap"}}>{od?"⚠ "+cleanDate(j.due_date):cleanDate(j.due_date)}</td>
+        </tr>;})}</tbody>
+      </table>}
+    </div>;
+
+    return <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>⚠ {lang==="lo"?"ຄວາມສ່ຽງ & ເກີນກໍານົດ":"Risk & Overdue Report"}</div>
+        <button onClick={printReport} style={{...BS("#dc2626"),padding:"7px 16px",fontSize:13}}>↓ PDF</button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}}>
+        <StatCard label="Overdue" value={overdueAll.length} color="#dc2626" icon="⚠"/>
+        <StatCard label="Blocked" value={blocked.length} color="#f59e0b" icon="🚫"/>
+        <StatCard label="No Update 7d+" value={stale.length} color="#7c3aed" icon="💤"/>
+        <StatCard label="0% Progress" value={noProgress.length} color="#64748b" icon="⬜"/>
+      </div>
+      <RiskTable title={`⚠ Overdue Jobs (${overdueAll.length})`} items={overdueAll} emptyMsg="No overdue jobs!" color="#dc2626"/>
+      <RiskTable title={`🚫 Blocked (${blocked.length})`} items={blocked} emptyMsg="No blocked jobs!" color="#f59e0b"/>
+      <RiskTable title={`💤 No Update in 7+ Days (${stale.length})`} items={stale} emptyMsg="All jobs recently updated!" color="#7c3aed"/>
+      {noProgress.length>0&&<RiskTable title={`⬜ In Progress but 0% (${noProgress.length})`} items={noProgress} emptyMsg="" color="#64748b"/>}
+    </div>;
+  };
+
+  // ── TAB: STAFF PERFORMANCE ────────────────────────────────────
+  const PerformanceReport=()=>{
+    const [fPerfUser,setFPerfUser]=useState("all");
+    const baseJobs=period==="all"?jobs:jobs.filter(inPeriod);
+    const perfUsers=fPerfUser==="all"?users:users.filter(u=>u.id===fPerfUser);
+    const now2=new Date();
+
+    const staffPerf=perfUsers.map(u=>{
+      const uj=baseJobs.filter(j=>j.assignee_id===u.id);
+      if(!uj.length)return null;
+      const done=uj.filter(j=>j.status==="done");
+      const overdue=uj.filter(j=>new Date(String(j.due_date).slice(0,10))<now2&&j.status!=="done");
+      const onTime=done.filter(j=>{
+        if(!j.due_date||!j.updated_at)return false;
+        return new Date(String(j.updated_at).slice(0,10))<=new Date(String(j.due_date).slice(0,10));
+      });
+      const monthlyMine=uj.filter(j=>j.id&&j.id.startsWith("mj_"));
+      const monthlyDone=monthlyMine.filter(j=>j.status==="done");
+      const active=uj.filter(j=>j.status!=="done");
+      const avgPg=active.length?avgNum(active.map(j=>Number(j.progress)||0)):100;
+      const compRate=pct(done.length,uj.length);
+      const onTimeRate=done.length?pct(onTime.length,done.length):100;
+      const overdueRate=pct(overdue.length,uj.length);
+      const monthlyRate=monthlyMine.length?pct(monthlyDone.length,monthlyMine.length):null;
+      const score=Math.round(compRate*0.35+onTimeRate*0.35+(100-overdueRate)*0.2+avgPg*0.10);
+      return {u,total:uj.length,done:done.length,overdue:overdue.length,onTime:onTime.length,monthly:{done:monthlyDone.length,total:monthlyMine.length},compRate,onTimeRate,overdueRate,avgPg,monthlyRate,score};
+    }).filter(Boolean).sort((a,b)=>b.score-a.score);
+
+    const scoreColor=s=>s>=80?"#16a34a":s>=60?"#f59e0b":"#dc2626";
+    const grade=s=>s>=90?"A":s>=80?"B":s>=70?"C":s>=60?"D":"F";
+
+    const printReport=()=>{
+      const summaryRows=staffPerf.map(s=>`<tr>
+        <td><strong>${s.u.name}</strong><br/><small>${s.u.department}</small></td>
+        <td style="text-align:center;font-size:18px;font-weight:800;color:${scoreColor(s.score)}">${s.score} <small>${grade(s.score)}</small></td>
+        <td>${s.total}</td><td>${s.done} (${s.compRate}%)</td><td>${s.onTimeRate}%</td>
+        <td style="color:${s.overdue>0?"#dc2626":"#16a34a"}">${s.overdue}</td>
+        <td>${s.monthlyRate!==null?s.monthlyRate+"%":"—"}</td><td>${s.avgPg}%</td>
+      </tr>`).join("");
+      // Per-person job details by project
+      const detailSections=staffPerf.map(s=>{
+        const byProj={};
+        baseJobs.filter(j=>j.assignee_id===s.u.id).forEach(j=>{const k=j.project_id||"__none__";if(!byProj[k])byProj[k]=[];byProj[k].push(j);});
+        const projHTML=Object.entries(byProj).map(([pid,pjobs])=>{
+          const pname=projects.find(p=>p.id===pid)?.name||"No Project";
+          const rows=pjobs.sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>{
+            const od=new Date(String(j.due_date).slice(0,10))<now2&&j.status!=="done";
+            return `<tr>
+              <td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>
+                ${j.notes?`<div style="font-size:10px;color:#64748b;font-style:italic;margin-top:2px">${j.notes}</div>`:""}
+              </td>
+              <td><span class="badge ${j.status}">${STATUS[j.status]?.en||j.status}</span></td>
+              <td class="p ${j.priority}">${j.priority}</td>
+              <td style="color:${od?"#dc2626":"#64748b"}">${od?"⚠ ":""}${cleanDate(j.due_date)}</td>
+              <td>${j.progress||0}%</td>
+            </tr>`;}).join("");
+          return `<h3 style="font-size:12px;color:#374151;margin:8px 0 4px;padding-left:8px;border-left:3px solid #e2e8f0">${pname}</h3>
+            <table><thead><tr><th>Job / Notes</th><th>Status</th><th>Priority</th><th>Due</th><th>%</th></tr></thead><tbody>${rows}</tbody></table>`;
+        }).join("");
+        return `<h2 style="margin-top:22px;border-left:4px solid ${scoreColor(s.score)};padding-left:10px">${s.u.name} — ${s.u.department} · Score ${s.score} (${grade(s.score)})</h2>${projHTML}`;
+      }).join("");
+      exportReport("Staff Performance Report",`
+        <h1>📊 Staff Performance Report</h1>
+        <div class="meta">Period: ${period.toUpperCase()} · Generated: ${now.toLocaleDateString()} · Manager: ${user.name}</div>
+        <p style="color:#64748b;font-size:11px;margin-bottom:14px">Score: Completion (35%) + On-Time (35%) + No-Overdue (20%) + Progress (10%)</p>
+        <table><thead><tr><th>Staff</th><th>Score</th><th>Total</th><th>Completed</th><th>On-Time</th><th>Overdue</th><th>Monthly</th><th>Avg%</th></tr></thead><tbody>${summaryRows}</tbody></table>
+        ${detailSections}
+      `);
+    };
+
+    return <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
+        <div>
+          <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>📊 {lang==="lo"?"ປະສິດທິພາບພະນັກງານ":"Staff Performance"}</div>
+          <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Score = Completion (35%) + On-Time (35%) + No-Overdue (20%) + Progress (10%)</div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <select value={fPerfUser} onChange={e=>setFPerfUser(e.target.value)}
+            style={{...SS,minWidth:140,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+            <option value="all">{lang==="lo"?"ທຸກຄົນ":"All Staff"}</option>
+            {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+          <button onClick={printReport} style={{...BS("#dc2626"),padding:"7px 16px",fontSize:13}}>↓ PDF</button>
+        </div>
+      </div>
+      {staffPerf.length===0&&<div style={{background:"#fff",borderRadius:12,padding:40,textAlign:"center",color:"#94a3b8"}}>No data for this period.</div>}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14,marginBottom:18}}>
+        {staffPerf.map((s,idx)=>(
+          <div key={s.u.id} style={{background:"#fff",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderLeft:`4px solid ${scoreColor(s.score)}`}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+              <div style={{position:"relative"}}>
+                <Avtr user={s.u} size={42}/>
+                {idx===0&&<div style={{position:"absolute",top:-6,right:-6,fontSize:14}}>🥇</div>}
+                {idx===1&&<div style={{position:"absolute",top:-6,right:-6,fontSize:14}}>🥈</div>}
+                {idx===2&&<div style={{position:"absolute",top:-6,right:-6,fontSize:14}}>🥉</div>}
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,color:"#0f172a",fontSize:14}}>{s.u.name}</div>
+                <div style={{fontSize:11,color:"#64748b"}}>{s.u.department}</div>
+              </div>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:28,fontWeight:800,color:scoreColor(s.score),lineHeight:1}}>{s.score}</div>
+                <div style={{fontSize:16,fontWeight:700,color:scoreColor(s.score)}}>{grade(s.score)}</div>
+              </div>
+            </div>
+            {[
+              {lbl:lang==="lo"?"ສໍາເລັດ":"Completion",val:`${s.done}/${s.total}`,p:s.compRate,c:"#3b82f6"},
+              {lbl:lang==="lo"?"ຕົງເວລາ":"On-Time",val:`${s.onTimeRate}%`,p:s.onTimeRate,c:"#16a34a"},
+              {lbl:lang==="lo"?"ຄວາມຄືບໜ້າ":"Avg Progress",val:`${s.avgPg}%`,p:s.avgPg,c:"#7c3aed"},
+              ...(s.monthlyRate!==null?[{lbl:lang==="lo"?"ວຽກປະຈໍາເດືອນ":"Monthly Routine",val:`${s.monthly.done}/${s.monthly.total}`,p:s.monthlyRate,c:"#059669"}]:[]),
+            ].map(m=>(
+              <div key={m.lbl} style={{marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+                  <span style={{fontSize:11,color:"#64748b"}}>{m.lbl}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:m.c}}>{m.val}</span>
+                </div>
+                <div style={{height:4,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${m.p}%`,background:m.c,borderRadius:99,transition:"width 0.5s"}}/>
+                </div>
+              </div>
+            ))}
+            {s.overdue>0&&<div style={{marginTop:8,fontSize:11,color:"#dc2626",fontWeight:600,background:"#fef2f2",padding:"4px 8px",borderRadius:6}}>⚠ {s.overdue} {lang==="lo"?"ວຽກເກີນກໍານົດ":"overdue"}</div>}
+          </div>
+        ))}
+      </div>
+      <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+        <div style={{padding:"12px 16px",borderBottom:"1px solid #f1f5f9",fontSize:13,fontWeight:700,color:"#0f172a"}}>📋 {lang==="lo"?"ສຸ່ມທຽບ":"Comparison"}</div>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+          <thead><tr style={{background:"#f8fafc"}}>
+            {["Staff","Score","Jobs","Done%","On-Time%","Overdue","Monthly%","Avg%"].map(h=><th key={h} style={{textAlign:"left",padding:"9px 12px",color:"#64748b",fontWeight:700,fontSize:10,textTransform:"uppercase",borderBottom:"1px solid #e8edf5"}}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {staffPerf.map(s=><tr key={s.u.id} style={{borderBottom:"1px solid #f8fafc"}} onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"} onMouseLeave={e=>e.currentTarget.style.background=""}>
+              <td style={{padding:"9px 12px"}}><Avtr user={s.u} size={22} showName/></td>
+              <td style={{padding:"9px 12px"}}><span style={{fontWeight:800,color:scoreColor(s.score),fontSize:14}}>{s.score}</span> <span style={{fontWeight:700,color:scoreColor(s.score)}}>{grade(s.score)}</span></td>
+              <td style={{padding:"9px 12px",fontWeight:600}}>{s.total}</td>
+              <td style={{padding:"9px 12px"}}><span style={{color:s.compRate>=70?"#16a34a":s.compRate>=50?"#f59e0b":"#dc2626",fontWeight:700}}>{s.compRate}%</span></td>
+              <td style={{padding:"9px 12px"}}><span style={{color:s.onTimeRate>=80?"#16a34a":s.onTimeRate>=60?"#f59e0b":"#dc2626",fontWeight:700}}>{s.onTimeRate}%</span></td>
+              <td style={{padding:"9px 12px",color:s.overdue>0?"#dc2626":"#16a34a",fontWeight:700}}>{s.overdue||"✓"}</td>
+              <td style={{padding:"9px 12px"}}>{s.monthlyRate!==null?<span style={{color:s.monthlyRate>=80?"#16a34a":s.monthlyRate>=50?"#f59e0b":"#dc2626",fontWeight:700}}>{s.monthlyRate}%</span>:<span style={{color:"#94a3b8"}}>—</span>}</td>
+              <td style={{padding:"9px 12px",color:"#64748b"}}>{s.avgPg}%</td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+    </div>;
+  };
+
+  // ── TAB: PROJECT PROGRESSION ───────────────────────────────────
+  const ProjectReport=()=>{
+    const [fProjUser,setFProjUser]=useState("all");
+    const sc={active:"#2563eb",planning:"#7c3aed",completed:"#16a34a",paused:"#f59e0b"};
+
+    const sortedProjects=[...projects].sort((a,b)=>{
+      const order={active:0,planning:1,paused:2,completed:3};
+      const oa=order[a.status]??4,ob=order[b.status]??4;
+      if(oa!==ob)return oa-ob;
+      const pjA=jobs.filter(j=>j.project_id===a.id),pjB=jobs.filter(j=>j.project_id===b.id);
+      const pA=pjA.length?Math.round(pjA.filter(j=>j.status==="done").length/pjA.length*100):0;
+      const pB=pjB.length?Math.round(pjB.filter(j=>j.status==="done").length/pjB.length*100):0;
+      return pB-pA;
+    });
+
+    const filterJob=j=>fProjUser==="all"||j.assignee_id===fProjUser;
+
+    const printReport=()=>{
+      const projHTML=sortedProjects.map(p=>{
+        const pj=jobs.filter(j=>j.project_id===p.id&&filterJob(j));
+        if(!pj.length)return "";
+        const done=pj.filter(j=>j.status==="done").length;
+        const pct2=pj.length?Math.round(done/pj.length*100):0;
+        const sorted=[...pj].sort((a,b)=>{
+          if(a.status==="done"&&b.status!=="done")return 1;
+          if(a.status!=="done"&&b.status==="done")return -1;
+          return (PO[a.priority]||9)-(PO[b.priority]||9);
+        });
+        const jobRows=sorted.map(j=>{
+          const od=new Date(String(j.due_date).slice(0,10))<new Date()&&j.status!=="done";
+          return `<tr>
+            <td style="${j.status==="done"?"text-decoration:line-through;color:#94a3b8":""}" >
+              <strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>
+              ${j.notes?`<div style="font-size:10px;color:#64748b;font-style:italic;margin-top:3px;padding-left:6px;border-left:2px solid #e2e8f0">${j.notes}</div>`:""}
+            </td>
+            <td>${getUser(j.assignee_id)?.name||"—"}</td>
+            <td><span class="badge ${j.status}">${STATUS[j.status]?.en||j.status}</span></td>
+            <td class="p ${j.priority}">${j.priority}</td>
+            <td style="color:${od?"#dc2626":"#64748b"}">${od?"⚠ ":""}${cleanDate(j.due_date)}</td>
+            <td>${j.progress||0}%</td>
+          </tr>`;}).join("");
+        return `
+          <h2 style="border-left:5px solid ${sc[p.status]||"#94a3b8"};padding-left:12px;margin-top:24px;background:#f8fafc;padding:10px 12px;border-radius:4px">
+            ${lang==="lo"&&p.name_lao?p.name_lao:p.name}
+            <span style="font-size:11px;color:#64748b;font-weight:400;margin-left:10px">${p.status} · ${done}/${pj.length} done · ${pct2}% complete · Due ${cleanDate(p.due_date)}</span>
+          </h2>
+          <table><thead><tr><th>Job / Notes</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due</th><th>%</th></tr></thead>
+          <tbody>${jobRows}</tbody></table>`;
+      }).join("");
+      exportReport("Project Progression Report",`
+        <h1>📂 Project Progression Report</h1>
+        <div class="meta">Generated: ${now.toLocaleDateString()} · Manager: ${user.name}${fProjUser!=="all"?" · Staff: "+users.find(u=>u.id===fProjUser)?.name:""}</div>
+        ${projHTML}
+      `);
+    };
+
+    return <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
+        <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>📂 {lang==="lo"?"ຄວາມຄືບໜ້າໂຄງການ":"Project Progression Report"}
+          <span style={{fontSize:12,color:"#64748b",fontWeight:400,marginLeft:8}}>Active → Planning → Paused → Completed · Notes always shown</span>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          {user.role==="leader"&&<select value={fProjUser} onChange={e=>setFProjUser(e.target.value)}
+            style={{...SS,minWidth:140,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+            <option value="all">{lang==="lo"?"ທຸກຄົນ":"All Staff"}</option>
+            {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>}
+          <button onClick={printReport} style={{...BS("#dc2626"),padding:"7px 16px",fontSize:13}}>↓ PDF</button>
+        </div>
+      </div>
+
+      {sortedProjects.map(p=>{
+        const pj=jobs.filter(j=>j.project_id===p.id&&filterJob(j));
+        const done=pj.filter(j=>j.status==="done").length;
+        const pct2=pj.length?Math.round(done/pj.length*100):0;
+        const projColor=sc[p.status]||"#94a3b8";
+        const sorted=[...pj].sort((a,b)=>{
+          if(a.status==="done"&&b.status!=="done")return 1;
+          if(a.status!=="done"&&b.status==="done")return -1;
+          return (PO[a.priority]||9)-(PO[b.priority]||9);
+        });
+
+        return <div key={p.id} style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",marginBottom:16,overflow:"hidden"}}>
+          {/* Project header */}
+          <div style={{padding:"14px 18px",borderLeft:`5px solid ${projColor}`,background:pct2===100?"#f0fdf4":"#fff"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+              <div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{fontWeight:800,color:"#0f172a",fontSize:15}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div>
+                  <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,background:projColor+"18",color:projColor,fontWeight:700,textTransform:"capitalize"}}>{p.status}</span>
+                  {pct2===100&&<span style={{fontSize:12}}>✅</span>}
+                </div>
+                {p.description&&<div style={{fontSize:12,color:"#64748b",marginTop:2}}>{p.description}</div>}
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:22,fontWeight:800,color:projColor}}>{pct2}%</div>
+                  <div style={{fontSize:11,color:"#94a3b8"}}>{done}/{pj.length} {lang==="lo"?"ວຽກ":"jobs"}</div>
+                </div>
+                <Avtr user={users.find(u=>u.id===p.leader_id)} size={32} showName/>
+              </div>
+            </div>
+            <div style={{marginTop:10,height:8,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${pct2}%`,background:pct2===100?"#16a34a":projColor,borderRadius:99,transition:"width 0.6s"}}/>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#94a3b8",marginTop:3}}>
+              <span>{lang==="lo"?"ເລີ່ມ":"Start"} {cleanDate(p.start_date)}</span>
+              <span>{lang==="lo"?"ກໍານົດ":"Due"} {cleanDate(p.due_date)}</span>
+            </div>
+          </div>
+
+          {/* Jobs — notes always shown */}
+          {sorted.map(j=>{
+            const od=new Date(String(j.due_date).slice(0,10))<new Date()&&j.status!=="done";
+            const pg=Number(j.progress)||0;
+            const isDone=j.status==="done";
+            const jColor=isDone?"#16a34a":od?"#dc2626":STATUS[j.status]?.c||"#e2e8f0";
+            return <div key={j.id} style={{padding:"10px 18px 10px 22px",borderBottom:"1px solid #f8fafc",borderLeft:`3px solid ${jColor}`,background:isDone?"#f9fafb":"#fff",opacity:isDone?0.68:1}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
+                    <span style={{fontWeight:isDone?400:600,color:isDone?"#94a3b8":"#1e293b",fontSize:13,textDecoration:isDone?"line-through":"none"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</span>
+                    <Badge status={j.status} lang={lang}/>
+                    <PriDot priority={j.priority} lang={lang}/>
+                    {od&&<span style={{fontSize:10,color:"#dc2626",fontWeight:700}}>⚠ Overdue</span>}
+                  </div>
+                  {/* Progress + meta row */}
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <div style={{width:80,height:4,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${pg}%`,background:isDone?"#16a34a":od?"#dc2626":"#3b82f6",borderRadius:99}}/>
+                      </div>
+                      <span style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>{pg}%</span>
+                    </div>
+                    <Avtr user={getUser(j.assignee_id)} size={16} showName/>
+                    <span style={{fontSize:11,color:od?"#dc2626":"#94a3b8",whiteSpace:"nowrap"}}>{od?"⚠ ":""}{cleanDate(j.due_date)}</span>
+                  </div>
+                  {/* Notes — always shown when they exist */}
+                  {j.notes&&<div style={{marginTop:5,fontSize:12,color:"#475569",background:"#f8fafc",padding:"5px 10px",borderRadius:6,lineHeight:1.6,borderLeft:"3px solid #e2e8f0",fontStyle:"italic"}}>{j.notes}</div>}
+                </div>
+              </div>
+            </div>;
+          })}
+          {pj.length===0&&<div style={{padding:"16px 18px",color:"#94a3b8",fontSize:12}}>{lang==="lo"?"ຍັງບໍ່ມີວຽກ":"No jobs yet."}</div>}
+        </div>;
+      })}
+    </div>;
+  };
+
+  const TABS=[
+    {id:"personal",en:"📋 Personal",  lo:"📋 ສ່ວນຕົວ",       show:true},
+    {id:"team",    en:"👥 Team",      lo:"👥 ທີມ",             show:user.role==="leader"},
+    {id:"project", en:"📂 Projects",  lo:"📂 ໂຄງການ",          show:true},
+    {id:"perf",    en:"📊 Performance",lo:"📊 ປະສິດທິພາບ",     show:user.role==="leader"},
+    {id:"risk",    en:"⚠ Risk",      lo:"⚠ ຄວາມສ່ຽງ",        show:user.role==="leader"},
+  ].filter(t=>t.show);
+
+  const PERIODS=[{v:"week",en:"This Week",lo:"ອາທິດນີ້"},{v:"month",en:"This Month",lo:"ເດືອນນີ້"},{v:"quarter",en:"Quarter",lo:"ໄຕມາດ"},{v:"year",en:"This Year",lo:"ປີນີ້"},{v:"all",en:"All Time",lo:"ທັງໝົດ"}];
+
+  return <div style={{animation:"fadeUp 0.3s ease"}}>
+    {/* Tab + Period bar */}
+    <div style={{background:"#fff",borderRadius:12,padding:"12px 16px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+      <div style={{display:"flex",gap:4}}>
+        {TABS.map(tb=><button key={tb.id} onClick={()=>setTab(tb.id)}
+          style={{padding:"7px 16px",borderRadius:8,border:"none",background:tab===tb.id?"#0f172a":"transparent",color:tab===tb.id?"#fff":"#64748b",fontWeight:tab===tb.id?700:500,fontSize:13,cursor:"pointer",transition:"all 0.15s"}}>
+          {tb[lang]||tb.en}
+        </button>)}
+      </div>
+      <div style={{display:"flex",gap:4}}>
+        {PERIODS.map(p=><button key={p.v} onClick={()=>setPeriod(p.v)}
+          style={{padding:"5px 12px",borderRadius:6,border:`1px solid ${period===p.v?"#2563eb":"#e2e8f0"}`,background:period===p.v?"#eff6ff":"#fff",color:period===p.v?"#2563eb":"#64748b",fontWeight:period===p.v?700:400,fontSize:12,cursor:"pointer"}}>
+          {p[lang]||p.en}
+        </button>)}
+      </div>
+    </div>
+
+    {tab==="personal"&&<PersonalReport/>}
+    {tab==="team"&&<TeamReport/>}
+    {tab==="project"&&<ProjectReport/>}
+    {tab==="perf"&&<PerformanceReport/>}
+    {tab==="risk"&&<RiskReport/>}
+  </div>;
+}
+
+// ── TEAM BOARD ─────────────────────────────────────────────────
+function BoardPage({board,user,users,getUser,onAddNote,onEditNote,onDeleteNote,lang}){
+  const t=T[lang];
+  // Wins removed; 4 columns only
+  const COLS=["📢 Announcements","💡 Ideas","✅ Action Items","❓ Questions"];
+  const COL_COLORS={"📢 Announcements":"#2563eb","💡 Ideas":"#7c3aed","✅ Action Items":"#059669","❓ Questions":"#f59e0b"};
+
+  const [modal,setModal]=useState(null);
+  const [editNote,setEditNote]=useState(null);
+  // Track which note IDs this user has "seen" — stored in localStorage per user
+  const seenKey="board_seen_"+user.id;
+  const getSeenIds=()=>{try{return JSON.parse(localStorage.getItem(seenKey)||"[]");}catch{return [];}};
+  const [seenIds,setSeenIds]=useState(()=>getSeenIds());
+  const markSeen=(ids)=>{const next=[...new Set([...seenIds,...ids])];setSeenIds(next);try{localStorage.setItem(seenKey,JSON.stringify(next));}catch{}};
+
+  // New notes = posted by others, not yet seen
+  const newNotes=board.filter(n=>String(n.author_id)!==String(user.id)&&!seenIds.includes(String(n.id)));
+
+  const notesByCol=useMemo(()=>{
+    const m={};
+    COLS.forEach(c=>{m[c]=board.filter(n=>n.column===c).sort((a,b)=>{
+      const ap=a.pinned===true||a.pinned==="true"?1:0,bp=b.pinned===true||b.pinned==="true"?1:0;
+      if(bp!==ap)return bp-ap;
+      return new Date(b.created_at||0)-new Date(a.created_at||0);
+    });});
+    return m;
+  },[board]);
+
+  return <div style={{animation:"fadeUp 0.3s ease"}}>
+    {/* Header */}
+    <div style={{background:"#fff",borderRadius:12,padding:"13px 18px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+      <div>
+        <div style={{fontSize:16,fontWeight:700,color:"#0f172a"}}>📌 {lang==="lo"?"ກະດານທີມ":"Team Board"}</div>
+        <div style={{color:"#64748b",fontSize:13,marginTop:1}}>{lang==="lo"?"ແບ່ງປັນຂ່າວ, ແນວຄວາມຄິດ ແລະ ລາຍການດໍາເນີນການ":"Share announcements, ideas and action items with your team"}</div>
+      </div>
+      <button onClick={()=>setModal({col:COLS[0]})} style={BS("#2563eb")}>+ {lang==="lo"?"ໂພດ":"Post Note"}</button>
+    </div>
+
+    {/* New notes notification banner */}
+    {newNotes.length>0&&<div style={{background:"linear-gradient(135deg,#1e3a5f,#312e81)",borderRadius:12,padding:"12px 18px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.12)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <span style={{fontSize:18}}>🔔</span>
+        <div>
+          <div style={{color:"#fff",fontSize:13,fontWeight:700}}>
+            {newNotes.length} {lang==="lo"?"ໝາຍເຫດໃໝ່ຈາກທີມ":"new note"+(newNotes.length>1?"s":"")} {lang==="lo"?"":"from your team"}
+          </div>
+          <div style={{color:"#93c5fd",fontSize:11,marginTop:1}}>
+            {newNotes.slice(0,2).map(n=>`"${(n.content||"").slice(0,40)}${n.content?.length>40?"…":""}" — ${getUser(n.author_id)?.name?.split(" ")[0]||"?"}`).join(" · ")}
+          </div>
+        </div>
+      </div>
+      <button onClick={()=>markSeen(newNotes.map(n=>String(n.id)))}
+        style={{padding:"6px 14px",borderRadius:8,border:"1px solid rgba(255,255,255,0.25)",background:"rgba(255,255,255,0.12)",color:"#e2e8f0",fontSize:12,fontWeight:600,cursor:"pointer",flexShrink:0}}>
+        ✓ {lang==="lo"?"ຮັບຊາບແລ້ວ":"Mark all seen"}
+      </button>
+    </div>}
+
+    {/* 4-column board */}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,alignItems:"start"}}>
+      {COLS.map(col=>{
+        const cc=COL_COLORS[col];
+        const colNotes=notesByCol[col]||[];
+        const colNew=colNotes.filter(n=>String(n.author_id)!==String(user.id)&&!seenIds.includes(String(n.id)));
+        return <div key={col} style={{background:"#f8fafc",borderRadius:12,padding:14,minHeight:180}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{col}</div>
+              {colNew.length>0&&<span style={{background:"#dc2626",color:"#fff",borderRadius:99,fontSize:10,fontWeight:700,padding:"1px 5px",minWidth:16,textAlign:"center"}}>{colNew.length}</span>}
+            </div>
+            <button onClick={()=>setModal({col})}
+              style={{width:22,height:22,borderRadius:"50%",border:"none",background:cc+"22",color:cc,fontSize:15,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,cursor:"pointer"}}>+</button>
+          </div>
+          {colNotes.length===0&&<div style={{color:"#cbd5e1",fontSize:12,textAlign:"center",paddingTop:10}}>—</div>}
+          {colNotes.map(note=>{
+            const au=getUser(note.author_id);
+            const isPinned=note.pinned==="true"||note.pinned===true;
+            const isNew=String(note.author_id)!==String(user.id)&&!seenIds.includes(String(note.id));
+            return <div key={note.id}
+              style={{background:"#fff",borderRadius:10,padding:11,marginBottom:8,boxShadow:isNew?"0 0 0 2px "+cc+", 0 2px 6px rgba(0,0,0,0.08)":"0 1px 3px rgba(0,0,0,0.06)",borderLeft:`3px solid ${cc}`,position:"relative",transition:"box-shadow 0.2s"}}
+              onClick={()=>isNew&&markSeen([String(note.id)])}>
+              {isPinned&&<div style={{position:"absolute",top:6,right:8,fontSize:11}}>📌</div>}
+              {isNew&&<div style={{position:"absolute",top:7,right:isPinned?24:8,width:7,height:7,borderRadius:"50%",background:"#dc2626"}}/>}
+              <div style={{fontSize:13,color:"#1e293b",lineHeight:1.55,fontWeight:note.important==="true"||note.important===true?"700":"400",marginBottom:7,paddingRight:isNew||isPinned?18:0}}>{note.content}</div>
+              {note.tag&&<span style={{fontSize:10,padding:"1px 7px",borderRadius:99,background:cc+"18",color:cc,fontWeight:700,display:"inline-block",marginBottom:6}}>#{note.tag}</span>}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{display:"flex",alignItems:"center",gap:4}}><Avtr user={au} size={15}/><span style={{fontSize:10,color:"#94a3b8"}}>{au?.name?.split(" ")[0]||"?"} · {cleanDate(note.created_at)}</span></div>
+                {(user.role==="leader"||String(note.author_id)===String(user.id))&&<div style={{display:"flex",gap:3}}>
+                  <button onClick={e=>{e.stopPropagation();setEditNote(note);}} style={{fontSize:11,color:"#64748b",background:"none",border:"none",padding:"2px 4px",cursor:"pointer"}}>✏</button>
+                  <button onClick={e=>{e.stopPropagation();onDeleteNote(note.id);}} style={{fontSize:11,color:"#dc2626",background:"none",border:"none",padding:"2px 4px",cursor:"pointer"}}>✕</button>
+                </div>}
+              </div>
+            </div>;
+          })}
+        </div>;
+      })}
+    </div>
+
+    {(modal||editNote)&&<NoteModal
+      initial={editNote}
+      defaultCol={modal?.col||editNote?.column||COLS[0]}
+      cols={COLS} colColors={COL_COLORS}
+      onClose={()=>{setModal(null);setEditNote(null);}}
+      onSave={data=>{if(editNote)onEditNote(data);else onAddNote(data);setModal(null);setEditNote(null);}}
+      user={user} lang={lang}
+    />}
+  </div>;
+}
+
+function NoteModal({initial,defaultCol,cols,colColors,onClose,onSave,user,lang}){
+  const [f,setF]=useState(initial||{content:"",column:defaultCol,tag:"",pinned:false,important:false,author_id:user.id});
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  return <Modal title={initial?(lang==="lo"?"ແກ້ໄຂ":"Edit Note"):(lang==="lo"?"ໂພດ":"Post Note")} onClose={onClose} onSave={()=>onSave(f)}>
+    <Lbl label={lang==="lo"?"ໂຖ":"Column"}>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {cols.map(c=>{const cc=colColors[c]||"#2563eb";return <button key={c} type="button" onClick={()=>set("column",c)}
+          style={{padding:"5px 10px",borderRadius:8,border:`2px solid ${f.column===c?cc:"#e2e8f0"}`,background:f.column===c?cc+"15":"#fff",color:f.column===c?cc:"#64748b",fontWeight:700,fontSize:12,cursor:"pointer"}}>{c}</button>;})}
+      </div>
+    </Lbl>
+    <Lbl label={lang==="lo"?"ເນື້ອຫາ":"Content"}>
+      <textarea value={f.content} onChange={e=>set("content",e.target.value)} style={{...IS,height:100,resize:"vertical"}} placeholder={lang==="lo"?"ຂຽນທີ່ນີ້...":"Write your note here..."}/>
+    </Lbl>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <Lbl label="Tag"><input value={f.tag||""} onChange={e=>set("tag",e.target.value)} style={IS} placeholder="e.g. urgent"/></Lbl>
+      <Lbl label={lang==="lo"?"ຕົວເລືອກ":"Options"}>
+        <div style={{display:"flex",gap:12,marginTop:4}}>
+          <label style={{display:"flex",alignItems:"center",gap:5,fontSize:13,cursor:"pointer"}}><input type="checkbox" checked={f.pinned===true||f.pinned==="true"} onChange={e=>set("pinned",e.target.checked)} style={{cursor:"pointer"}}/> 📌 Pin</label>
+          <label style={{display:"flex",alignItems:"center",gap:5,fontSize:13,cursor:"pointer"}}><input type="checkbox" checked={f.important===true||f.important==="true"} onChange={e=>set("important",e.target.checked)} style={{cursor:"pointer"}}/> ⭐ Bold</label>
+        </div>
+      </Lbl>
+    </div>
+  </Modal>;
+}
+
+// ── USER / PROJECT MODALS ──────────────────────────────────────
+function UserModal({initial,onClose,onSave,saving,lang}){
+  const t=T[lang];
+  const [f,setF]=useState(initial||{name:"",name_lao:"",email:"",password:"",role:"runner",department:"Finance",avatar:""});
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  return <Modal title={initial?"Edit User":"Add User"} onClose={onClose} onSave={()=>onSave(f)} saving={saving}>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <Lbl label={t.name}><input value={f.name} onChange={e=>set("name",e.target.value)} style={IS}/></Lbl>
+      <Lbl label={t.nameLao}><input value={f.name_lao||""} onChange={e=>set("name_lao",e.target.value)} style={IS}/></Lbl>
+      <Lbl label={t.email}><input value={f.email} onChange={e=>set("email",e.target.value)} style={IS}/></Lbl>
+      <Lbl label={t.password}><input value={f.password||""} onChange={e=>set("password",e.target.value)} style={IS} placeholder={initial?"Leave blank to keep":""}/></Lbl>
+      <Lbl label={t.role}><select value={f.role} onChange={e=>set("role",e.target.value)} style={IS}><option value="leader">{t.leader}</option><option value="runner">{t.runner}</option></select></Lbl>
+      <Lbl label={t.dept}><input value={f.department||""} onChange={e=>set("department",e.target.value)} style={IS}/></Lbl>
+      <Lbl label="Avatar (2 letters)"><input value={f.avatar||""} onChange={e=>set("avatar",e.target.value.slice(0,2).toUpperCase())} style={IS} maxLength={2}/></Lbl>
+    </div>
+  </Modal>;
+}
+
+function ProjectModal({initial,onClose,onSave,users,saving,lang}){
+  const t=T[lang];
+  const [f,setF]=useState(initial||{name:"",name_lao:"",description:"",leader_id:users[0]?.id||"",status:"planning",priority:"medium",category:"Financial Report",start_date:"",due_date:""});
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  return <Modal title={initial?"Edit Project":"New Project"} onClose={onClose} onSave={()=>onSave(f)} saving={saving} wide>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div style={{gridColumn:"1/-1"}}><Lbl label={t.name+" (EN)"}><input value={f.name} onChange={e=>set("name",e.target.value)} style={IS}/></Lbl></div>
+      <div style={{gridColumn:"1/-1"}}><Lbl label={t.name+" (ລາວ)"}><input value={f.name_lao||""} onChange={e=>set("name_lao",e.target.value)} style={IS}/></Lbl></div>
+      <div style={{gridColumn:"1/-1"}}><Lbl label={t.desc}><textarea value={f.description||""} onChange={e=>set("description",e.target.value)} style={{...IS,height:55}}/></Lbl></div>
+      <Lbl label={t.leader}><select value={f.leader_id} onChange={e=>set("leader_id",e.target.value)} style={IS}>{users.filter(u=>u.role==="leader").map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Lbl>
+      <Lbl label={t.category}><select value={f.category||""} onChange={e=>set("category",e.target.value)} style={IS}><option value="">--</option>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select></Lbl>
+      <Lbl label={t.priority}><select value={f.priority} onChange={e=>set("priority",e.target.value)} style={IS}>{Object.entries(PRIORITY).map(([k,v])=><option key={k} value={k}>{v[lang]||v.en}</option>)}</select></Lbl>
+      <Lbl label={t.status}><select value={f.status} onChange={e=>set("status",e.target.value)} style={IS}><option value="planning">Planning</option><option value="active">Active</option><option value="paused">Paused</option><option value="completed">Completed</option></select></Lbl>
+      <Lbl label={t.startDate}><input type="date" value={f.start_date||""} onChange={e=>set("start_date",e.target.value)} style={IS}/></Lbl>
+      <Lbl label={t.dueDate}><input type="date" value={f.due_date||""} onChange={e=>set("due_date",e.target.value)} style={IS}/></Lbl>
+    </div>
+  </Modal>;
+}
+
+function JobFormModal({initial,onClose,onSave,projects,users,user,lang,saving}){
+  const [f,setF]=useState(initial||{title:"",title_lao:"",description:"",project_id:projects[0]?.id||"",assignee_id:"",status:"todo",priority:"medium",category:"",start_date:"",due_date:"",estimated_hours:8,actual_hours:0,notes:"",progress:0});
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  return <Modal title={initial?"Edit Job":"New Job"} onClose={onClose} onSave={()=>onSave(f)} saving={saving} wide>
+    <JobForm form={f} set={set} projects={projects} users={users} user={user} lang={lang}/>
+  </Modal>;
+}
+
+function JobRequestModal({onClose,onSave,projects,users,user,lang,saving}){
+  const t=T[lang];
+  const [f,setF]=useState({title:"",title_lao:"",description:"",project_id:projects[0]?.id||"",assignee_id:user.id,priority:"medium",category:"",start_date:"",due_date:"",estimated_hours:8,notes:""});
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  return <Modal title={"📥 "+t.requestJob} onClose={onClose} onSave={()=>onSave(f)} saveLabel={t.requestJob} saveColor="#f59e0b" saving={saving} wide>
+    <div style={{padding:"10px 14px",background:"#fefce8",borderRadius:8,marginBottom:14,fontSize:13,color:"#92400e"}}>ℹ️ {lang==="lo"?"ຄໍາຂໍນີ້ຈະສົ່ງໃຫ້ຫົວໜ້າອະນຸມັດ":"This request will be sent to your leader for approval."}</div>
+    <JobForm form={f} set={set} projects={projects} users={users} user={user} lang={lang} isRequest={true}/>
+  </Modal>;
+}
+
+// ── MAIN APP ───────────────────────────────────────────────────
+function App(){
+  const [lang,setLang]=useState("en");
+  const [user,setUser]=useState(null);
+  const [users,setUsers]=useState([]);
+  const [projects,setProjects]=useState([]);
+  const [jobs,setJobs]=useState([]);
+  const [monthly,setMonthly]=useState([]);
+  const [pending,setPending]=useState([]);
+  const [board,setBoard]=useState([]);
+  const [page,setPage]=useState("dashboard");
+  const [filterProj,setFilterProj]=useState(null); // for project→jobs drill-through
+  const [dashFilter,setDashFilter]=useState(null);  // for stat card → jobs filtered
+  const [modal,setModal]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const [loading,setLoading]=useState(false);
+  const [generating,setGenerating]=useState(false);
+  const [notif,setNotif]=useState(null);
+  const t=T[lang];
+
+  const notify=(msg,type="success")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);};
+
+  const reload=async()=>{
+    setLoading(true);
+    try{const all=await apiGet({action:"getAll"});if(!all.error){setUsers(all.users||[]);setProjects(all.projects||[]);setJobs(all.jobs||[]);setMonthly(all.monthly||[]);setPending(all.pending||[]);setBoard(all.board||[]);}}
+    catch(e){notify("Connection error","error");}
+    setLoading(false);
+  };
+
+  const handleLogin=async(u,us,pr,jb,mo,pe,bd)=>{
+    setUser(u);setUsers(us);setProjects(pr);setJobs(jb);setMonthly(mo||[]);setPending(pe||[]);setBoard(bd||[]);setPage("dashboard");
+    notify(lang==="lo"?"ຍິນດີຕ້ອນຮັບ, ":"Welcome, "+u.name.split(" ")[0]);
+    // Auto-generate monthly if 1st-3rd of month
+    const now=new Date(),day=now.getDate(),m=now.getMonth()+1,y=now.getFullYear();
+    const already=(jb||[]).some(j=>j.id&&j.id.startsWith("mj_")&&j.id.includes(`_${y}_${m}`));
+    if(day<=3&&!already&&(mo||[]).some(tp=>tp.active===true||tp.active==="true"||tp.active===1)){
+      try{const res=await apiPost({action:"generateMonthly"});if(res.success&&res.created>0){notify(`📅 ${res.created} monthly jobs for ${m}/${y}!`);const all=await apiGet({action:"getAll"});if(!all.error){setJobs(all.jobs||[]);setMonthly(all.monthly||[]);}}}catch(e){}
+    }
+  };
+
+  const getUser=id=>users.find(u=>u.id===id)||null;
+  const today=()=>new Date().toISOString().split("T")[0];
+
+  const myJobs=jobs.filter(j=>user?.role==="runner"?j.assignee_id===user.id:true);
+  const stats={total:myJobs.length,done:myJobs.filter(j=>j.status==="done").length,inProgress:myJobs.filter(j=>j.status==="in-progress").length,overdue:myJobs.filter(j=>new Date(j.due_date)<new Date()&&j.status!=="done").length};
+
+  // CRUD
+  const logActivity=async(jobId,action,comment)=>{
+    try{
+      await apiPost({action:"logActivity",payload:{
+        id:"log"+Date.now(),job_id:jobId,user_id:user.id,
+        action,timestamp:new Date().toISOString().slice(0,19).replace("T"," "),comment
+      }});
+    }catch(e){}
+  };
+
+  const saveJob=async(data,isNew)=>{
+    setSaving(true);
+    const payload=isNew?{...data,id:"j"+Date.now(),created_at:today(),updated_at:today()}:{...data,updated_at:today()};
+    try{
+      const res=await apiPost({action:isNew?"addJob":"updateJob",payload});
+      if(res.error){notify("Error: "+res.error,"error");setSaving(false);return;}
+      if(isNew)setJobs(p=>[...p,payload]);
+      else setJobs(p=>p.map(j=>j.id===payload.id?payload:j));
+      setModal(null);
+      notify(t.saved);
+      // Log activity to ACTIVITY_LOG sheet
+      const oldJob=isNew?null:jobs.find(j=>j.id===payload.id);
+      const changes=[];
+      if(!isNew&&oldJob){
+        if(oldJob.status!==payload.status)changes.push(`Status: ${oldJob.status}→${payload.status}`);
+        if(oldJob.progress!==payload.progress)changes.push(`Progress: ${oldJob.progress||0}%→${payload.progress||0}%`);
+        if(oldJob.actual_hours!==payload.actual_hours)changes.push(`Hours: ${oldJob.actual_hours||0}→${payload.actual_hours||0}`);
+        if(oldJob.notes!==payload.notes&&payload.notes)changes.push("Notes updated");
+      }
+      const action=isNew?"created":changes.length?changes.join(", "):"updated";
+      logActivity(payload.id,isNew?"job_created":"job_updated",action);
+      // Auto-reload from Google Sheets to confirm sync
+      setTimeout(async()=>{
+        try{const all=await apiGet({action:"getAll"});if(!all.error){setJobs(all.jobs||[]);}}catch(e){}
+      },800);
+    }
+    catch(e){notify("Save failed","error");}
+    setSaving(false);
+  };
+  const deleteJob=async(id)=>{
+    if(!window.confirm("Delete this job?"))return;
+    try{await apiPost({action:"deleteJob",id});setJobs(p=>p.filter(j=>j.id!==id));notify("Deleted","info");}catch(e){notify("Error","error");}
+  };
+  const saveProject=async(data,isNew)=>{
+    setSaving(true);
+    const payload=isNew?{...data,id:"p"+Date.now(),created_at:today()}:data;
+    try{const res=await apiPost({action:isNew?"addProject":"updateProject",payload});if(res.error){notify("Error: "+res.error,"error");setSaving(false);return;}if(isNew)setProjects(p=>[...p,payload]);else setProjects(p=>p.map(j=>j.id===payload.id?payload:j));setModal(null);notify(t.saved);}
+    catch(e){notify("Save failed","error");}
+    setSaving(false);
+  };
+  const deleteProject=async(id)=>{if(!window.confirm("Delete?"))return;try{await apiPost({action:"deleteProject",id});setProjects(p=>p.filter(j=>j.id!==id));notify("Deleted","info");}catch(e){notify("Error","error");}};
+  const saveUser=async(data,isNew)=>{
+    setSaving(true);
+    const payload=isNew?{...data,id:"u"+Date.now(),created_at:today()}:{...data};
+    if(!payload.avatar)payload.avatar=(payload.name||"U").slice(0,2).toUpperCase();
+    if(!isNew&&!payload.password)delete payload.password;
+    try{const res=await apiPost({action:isNew?"addUser":"updateUser",payload});if(res.error){notify("Error: "+res.error,"error");setSaving(false);return;}if(isNew)setUsers(p=>[...p,payload]);else setUsers(p=>p.map(u=>u.id===payload.id?{...u,...payload}:u));setModal(null);notify(t.saved);}
+    catch(e){notify("Save failed","error");}
+    setSaving(false);
+  };
+  const deleteUser=async(id)=>{if(!window.confirm("Delete user?"))return;try{await apiPost({action:"deleteUser",id});setUsers(p=>p.filter(u=>u.id!==id));notify("Deleted","info");}catch(e){notify("Error","error");}};
+  const saveTemplate=async(data,isNew)=>{
+    setSaving(true);
+    const payload=isNew?{...data,id:"mt"+Date.now(),owner_id:user.id,default_assignee_id:data.default_assignee_id||user.id}:{...data};
+    try{const res=await apiPost({action:isNew?"addMonthlyTemplate":"updateMonthlyTemplate",payload});if(res.error){notify("Error: "+res.error,"error");setSaving(false);return;}if(isNew)setMonthly(p=>[...p,payload]);else setMonthly(p=>p.map(tp=>tp.id===payload.id?payload:tp));notify("Template saved!");}
+    catch(e){notify("Save failed","error");}
+    setSaving(false);
+  };
+  const deleteTemplate=async(id)=>{if(!window.confirm("Delete template?"))return;try{await apiPost({action:"deleteMonthlyTemplate",id});setMonthly(p=>p.filter(tp=>tp.id!==id));notify("Deleted","info");}catch(e){notify("Error","error");}};
+  const submitRequest=async(data)=>{
+    setSaving(true);
+    const payload={...data,id:"req"+Date.now(),approval_status:"pending",requested_by:user.id,request_date:today(),status:"todo"};
+    try{const res=await apiPost({action:"submitJobRequest",payload});if(res.error){notify("Error: "+res.error,"error");setSaving(false);return;}setPending(p=>[...p,payload]);setModal(null);notify(lang==="lo"?"ສົ່ງຄໍາຂໍແລ້ວ!":"Request submitted! Waiting for approval.");}
+    catch(e){notify("Submit failed","error");}
+    setSaving(false);
+  };
+  const approveJob=async(id)=>{
+    try{const res=await apiPost({action:"approveJob",id});if(res.error){notify("Error: "+res.error,"error");return;}const job=pending.find(j=>j.id===id);if(job){const nj={...job,status:"todo",created_at:today(),updated_at:today()};delete nj.approval_status;delete nj.requested_by;delete nj.request_date;delete nj.reject_reason;setJobs(p=>[...p,nj]);}setPending(p=>p.map(j=>j.id===id?{...j,approval_status:"approved"}:j));notify("Approved!");}
+    catch(e){notify("Error","error");}
+  };
+  const rejectJob=async(id,reason)=>{try{await apiPost({action:"rejectJob",id,reason});setPending(p=>p.map(j=>j.id===id?{...j,approval_status:"rejected",reject_reason:reason}:j));notify("Rejected","info");}catch(e){notify("Error","error");}};
+  const generateMonthly=async()=>{setGenerating(true);try{const res=await apiPost({action:"generateMonthly"});if(res.error)notify("Error: "+res.error,"error");else{notify(`✅ Generated ${res.created} jobs!`);await reload();}}catch(e){notify("Error","error");}setGenerating(false);};
+
+  // Board CRUD
+  const addNote=async(data)=>{
+    const payload={...data,id:"n"+Date.now(),author_id:user.id,created_at:today()};
+    try{await apiPost({action:"addBoardNote",payload});setBoard(p=>[...p,payload]);notify("Posted!");}catch(e){notify("Error","error");}
+  };
+  const editNote=async(data)=>{
+    try{await apiPost({action:"updateBoardNote",payload:data});setBoard(p=>p.map(n=>n.id===data.id?data:n));notify("Updated!");}catch(e){notify("Error","error");}
+  };
+  const deleteNote=async(id)=>{if(!window.confirm("Delete note?"))return;try{await apiPost({action:"deleteBoardNote",id});setBoard(p=>p.filter(n=>n.id!==id));notify("Deleted","info");}catch(e){notify("Error","error");}};
+
+  const exportCSV=()=>{const rows=[["ID","Project","Title EN","Title Lao","Category","Assignee","Status","Priority","Start","Due","Est.Hrs","Act.Hrs","Progress%","Notes"],...jobs.map(j=>[j.id,projects.find(p=>p.id===j.project_id)?.name||"",j.title,j.title_lao||"",j.category,getUser(j.assignee_id)?.name||"",STATUS[j.status]?.en||j.status,PRIORITY[j.priority]?.en||j.priority,j.start_date,j.due_date,j.estimated_hours,j.actual_hours||0,j.progress||0,j.notes||""])];const csv=rows.map(r=>r.map(c=>`"${String(c||"").replace(/"/g,'""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}));a.download="taskflow_report.csv";a.click();notify("CSV exported!");};
+  const exportPDF=()=>{const win=window.open("","_blank");const rows=jobs.map(j=>`<tr><td>${projects.find(p=>p.id===j.project_id)?.name||""}</td><td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong><br/><small>${j.category||""}</small></td><td>${getUser(j.assignee_id)?.name||"-"}</td><td class="b ${j.status}">${STATUS[j.status]?.[lang]||j.status}</td><td class="p ${j.priority}">${PRIORITY[j.priority]?.[lang]||j.priority}</td><td>${j.due_date}</td><td>${j.progress||0}%</td></tr>`).join("");win.document.write(`<!DOCTYPE html><html><head><title>Report</title><style>body{font-family:sans-serif;padding:24px;font-size:12px}table{width:100%;border-collapse:collapse}th{background:#0f172a;color:#fff;padding:8px;text-align:left;font-size:10px;text-transform:uppercase}td{padding:7px;border-bottom:1px solid #e2e8f0}tr:nth-child(even){background:#f8fafc}.b{padding:2px 6px;border-radius:99px;font-size:10px;font-weight:700}.todo{background:#f1f5f9;color:#64748b}.in-progress{background:#eff6ff;color:#2563eb}.review{background:#f5f3ff;color:#7c3aed}.done{background:#f0fdf4;color:#16a34a}.blocked{background:#fef2f2;color:#dc2626}.p{font-weight:700}.urgent{color:#dc2626}.high{color:#f97316}.medium{color:#f59e0b}.low{color:#94a3b8}</style></head><body><h2>Finance Report — ${new Date().toLocaleDateString()} · ${user.name}</h2><table><thead><tr><th>Project</th><th>Job</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due</th><th>Progress</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);win.document.close();setTimeout(()=>win.print(),400);notify("PDF ready!");};
+
+  if(!user) return <Login onLogin={handleLogin} lang={lang} setLang={setLang}/>;
+
+  const pendingCount=pending.filter(j=>!j.approval_status||j.approval_status==="pending").length;
+
+  // Board new-note count for sidebar badge (notes by others, stored seen in localStorage)
+  const boardSeenKey="board_seen_"+user?.id;
+  const getBoardSeen=()=>{try{return JSON.parse(localStorage.getItem(boardSeenKey)||"[]");}catch{return [];}};
+  const boardNewCount=board.filter(n=>String(n.author_id)!==String(user?.id||"")&&!getBoardSeen().includes(String(n.id))).length;
+
+  const navItems=[
+    {id:"dashboard",icon:"⬡",en:"Dashboard",lo:"ໜ້າຫຼັກ"},
+    {id:"jobs",icon:"✦",en:"All Jobs",lo:"ວຽກທັງໝົດ"},
+    {id:"projects",icon:"◈",en:"Projects",lo:"ໂຄງການ"},
+    {id:"team",icon:"◉",en:"Team",lo:"ທີມງານ"},
+    {id:"monthly",icon:"📅",en:"Monthly Jobs",lo:"ວຽກປະຈໍາເດືອນ"},
+    {id:"pending",icon:"📥",en:"Approvals",lo:"ອະນຸມັດ",badge:pendingCount},
+    {id:"timeline",icon:"📊",en:"Timeline",lo:"ເສັ້ນທາງ"},
+    {id:"board",icon:"📌",en:"Team Board",lo:"ກະດານ",badge:boardNewCount},
+    {id:"reports",icon:"📈",en:"Reports",lo:"ລາຍງານ"},
+  ];
+
+  return <div style={{display:"flex",height:"100vh",fontFamily:"'DM Sans','Noto Sans Lao',sans-serif",background:"#f0f2f8",overflow:"hidden"}}>
+    {/* SIDEBAR */}
+    <aside style={{width:218,background:"#0f1729",display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden",position:"relative"}}>
+      <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at top left,#1e3a5f44,transparent 60%),radial-gradient(ellipse at bottom right,#312e8122,transparent 60%)",pointerEvents:"none"}}/>
+      <div style={{padding:"18px 18px 10px",position:"relative",zIndex:1}}>
+        <div style={{fontSize:10,letterSpacing:3,color:"#4a90b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Financial Statement TaskFlow</div>
+        <div style={{fontSize:15,fontWeight:800,color:"#fff",lineHeight:1.3}}>{lang==="lo"?"ການເງິນ &\nບັນຊີ":"Finance &\nAccounting"}</div>
+      </div>
+      <div style={{padding:"0 18px 10px",position:"relative",zIndex:1,display:"flex",gap:5}}>
+        {["en","lo"].map(l=><button key={l} onClick={()=>setLang(l)} style={{flex:1,padding:"4px",borderRadius:5,border:"1px solid rgba(255,255,255,0.1)",background:lang===l?"rgba(59,130,246,0.25)":"transparent",color:lang===l?"#93c5fd":"#475569",fontSize:11,fontWeight:600}}>{l==="en"?"EN":"ລາວ"}</button>)}
+      </div>
+      <div style={{padding:"0 8px",position:"relative",zIndex:1,flex:1,overflowY:"auto"}}>
+        {navItems.map(item=><button key={item.id} onClick={()=>setPage(item.id)} style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"8px 12px",borderRadius:8,border:"none",marginBottom:2,background:page===item.id?"rgba(59,130,246,0.18)":"transparent",color:page===item.id?"#60a5fa":"#94a3b8",fontWeight:page===item.id?600:400,fontSize:13,textAlign:"left",borderLeft:page===item.id?"2px solid #3b82f6":"2px solid transparent",position:"relative"}}>
+          <span style={{fontSize:13}}>{item.icon}</span><span style={{flex:1}}>{item[lang]||item.en}</span>
+          {(item.badge||0)>0&&<span style={{background:"#dc2626",color:"#fff",borderRadius:99,fontSize:10,fontWeight:700,padding:"1px 5px",minWidth:16,textAlign:"center"}}>{item.badge}</span>}
+        </button>)}
+      </div>
+      <div style={{padding:"10px 14px",borderTop:"1px solid #1e2d4a",position:"relative",zIndex:1}}>
+        {<div style={{fontSize:10,color:loading?"#60a5fa":"#f59e0b",marginBottom:6,textAlign:"center",background:loading?"rgba(59,130,246,0.1)":"rgba(245,158,11,0.1)",padding:"3px 8px",borderRadius:4}}>{loading?"⏳ Syncing...":"⚠ Demo Mode"}</div>}
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+          <div style={{width:30,height:30,borderRadius:"50%",background:user.role==="leader"?"linear-gradient(135deg,#3b82f6,#7c3aed)":"linear-gradient(135deg,#06b6d4,#10b981)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{user.avatar||(user.name||"?")[0]}</div>
+          <div><div style={{color:"#e2e8f0",fontSize:12,fontWeight:600}}>{user.name?.split(" ")[0]}</div><div style={{color:"#4a90b8",fontSize:10,textTransform:"uppercase",letterSpacing:0.5}}>{user.role==="leader"?t.leader:t.runner}</div></div>
+        </div>
+        <div style={{display:"flex",gap:5}}>
+          <button onClick={reload} disabled={loading} style={{flex:1,padding:"5px",borderRadius:6,border:"1px solid #1e2d4a",background:"rgba(59,130,246,0.15)",color:"#60a5fa",fontSize:11}}>{loading?<span className="spin">◌</span>:"↻"} Sync</button>
+          <button onClick={()=>{setUser(null);setUsers([]);setProjects([]);setJobs([]);setBoard([]);}} style={{flex:1,padding:"5px",borderRadius:6,border:"1px solid #1e2d4a",background:"transparent",color:"#64748b",fontSize:11}}>{t.signOut}</button>
+        </div>
+      </div>
+    </aside>
+
+    {/* MAIN */}
+    <main style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div style={{background:"#fff",padding:"11px 22px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid #e8edf5",flexShrink:0}}>
+        <div>
+          <div style={{fontSize:17,fontWeight:700,color:"#0f172a"}}>{navItems.find(n=>n.id===page)?.[lang]||navItems.find(n=>n.id===page)?.en}</div>
+          <div style={{fontSize:11,color:"#94a3b8"}}>{new Date().toLocaleDateString(lang==="lo"?"lo-LA":"en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {(page==="jobs"||page==="dashboard")&&<><button onClick={exportCSV} style={BS("#059669")}>{t.exportCSV}</button><button onClick={exportPDF} style={BS("#dc2626")}>{t.exportPDF}</button></>}
+          {page==="jobs"&&user.role==="leader"&&<button onClick={()=>setModal({type:"addJob"})} style={BS("#2563eb")}>{t.newJob}</button>}
+          {page==="jobs"&&user.role==="runner"&&<button onClick={()=>setModal({type:"requestJob"})} style={BS("#f59e0b")}>{t.requestJob}</button>}
+          {page==="projects"&&user.role==="leader"&&<button onClick={()=>setModal({type:"addProject"})} style={BS("#7c3aed")}>{t.newProject}</button>}
+          {page==="team"&&user.role==="leader"&&<button onClick={()=>setModal({type:"addUser"})} style={BS("#059669")}>{t.addUser}</button>}
+        </div>
+      </div>
+      <div style={{flex:1,overflow:"auto",padding:20}}>
+        {page==="dashboard"&&<Dashboard stats={stats} jobs={jobs} projects={projects} user={user} getUser={getUser} onViewJobs={()=>setPage("jobs")} onViewMonthly={()=>setPage("monthly")} onJobClick={j=>setModal({type:"editJob",data:j})} onViewFiltered={(f)=>{if(f.startsWith("proj_")){setFilterProj(f.slice(5));setPage("jobs");}else if(f==="overdue"){setFilterProj(null);setPage("jobs");setDashFilter("overdue");}else if(f==="done"){setFilterProj(null);setPage("jobs");setDashFilter("done");}else if(f==="in-progress"){setFilterProj(null);setPage("jobs");setDashFilter("in-progress");}else{setFilterProj(null);setPage("jobs");}}} lang={lang}/>}
+        {page==="jobs"&&<JobsPage allJobs={jobs} filterProj={filterProj} setFilterProj={setFilterProj} dashFilter={dashFilter} clearDashFilter={()=>setDashFilter(null)} projects={projects} users={users} user={user} getUser={getUser} onEdit={j=>setModal({type:"editJob",data:j})} onDelete={deleteJob} onInlineUpdate={j=>saveJob(j,false)} lang={lang} loading={loading} saving={saving}/>}
+        {page==="projects"&&<ProjectsPage projects={projects} jobs={jobs} user={user} getUser={getUser} onSelectProj={id=>{setFilterProj(id);setPage("jobs");}} onEdit={p=>setModal({type:"editProject",data:p})} onDelete={deleteProject} lang={lang}/>}
+        {page==="team"&&<TeamPage users={users} jobs={jobs} user={user} onAddUser={()=>setModal({type:"addUser"})} onEditUser={u=>setModal({type:"editUser",data:u})} onDeleteUser={deleteUser} lang={lang}/>}
+        {page==="monthly"&&<MonthlyPage monthly={monthly} jobs={jobs} user={user} users={users} projects={projects} getUser={getUser} onSaveTemplate={saveTemplate} onDeleteTemplate={deleteTemplate} onGenerate={generateMonthly} lang={lang} generating={generating}/>}
+        {page==="pending"&&<PendingPage pending={pending} user={user} getUser={getUser} onApprove={approveJob} onReject={rejectJob} lang={lang}/>}
+        {page==="timeline"&&<TimelinePage projects={projects} jobs={jobs} getUser={getUser} lang={lang}/>}
+        {page==="board"&&<BoardPage board={board} user={user} users={users} getUser={getUser} onAddNote={addNote} onEditNote={editNote} onDeleteNote={deleteNote} lang={lang}/>}
+        {page==="reports"&&<ReportsPage jobs={jobs} projects={projects} users={users} user={user} getUser={getUser} lang={lang}/>}
+      </div>
+    </main>
+
+    {/* MODALS */}
+    {(modal?.type==="addJob"||modal?.type==="editJob")&&<JobFormModal initial={modal.data} onClose={()=>setModal(null)} onSave={data=>saveJob(data,!modal.data)} projects={projects} users={users} user={user} lang={lang} saving={saving}/>}
+    {modal?.type==="requestJob"&&<JobRequestModal onClose={()=>setModal(null)} onSave={submitRequest} projects={projects} users={users} user={user} lang={lang} saving={saving}/>}
+    {(modal?.type==="addProject"||modal?.type==="editProject")&&<ProjectModal initial={modal.data} onClose={()=>setModal(null)} onSave={data=>saveProject(data,!modal.data)} users={users} saving={saving} lang={lang}/>}
+    {(modal?.type==="addUser"||modal?.type==="editUser")&&<UserModal initial={modal.data} onClose={()=>setModal(null)} onSave={data=>saveUser(data,!modal.data)} saving={saving} lang={lang}/>}
+
+    {notif&&<div style={{position:"fixed",bottom:20,right:20,padding:"11px 18px",borderRadius:10,background:notif.type==="success"?"#16a34a":notif.type==="info"?"#2563eb":"#dc2626",color:"#fff",fontWeight:600,fontSize:13,boxShadow:"0 4px 20px rgba(0,0,0,0.2)",zIndex:9999,animation:"fadeUp 0.3s ease"}}>{notif.msg}</div>}
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
