@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Financial Taskflow</title>
+<title>TaskFlow Finance & Accounting</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -219,7 +219,7 @@ function Login({onLogin,lang,setLang}){
     </div>
     <div style={{position:"relative",zIndex:1,margin:"auto",width:400,padding:20}}>
       <div style={{textAlign:"center",marginBottom:24}}>
-        <div style={{fontSize:11,letterSpacing:4,color:"#3b82f6",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>FS Team Taskflow</div>
+        <div style={{fontSize:11,letterSpacing:4,color:"#3b82f6",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>FS Taskflow v9</div>
         <div style={{fontSize:28,fontWeight:800,color:"#fff"}}>{lang==="lo"?"ການເງິນ & ບັນຊີ":"Finance & Accounting"}</div>
         <div style={{color:"#64748b",fontSize:13,marginTop:5}}>{lang==="lo"?"ເຂົ້າສູ່ລະບົບ":"Sign in to your workspace"}</div>
       </div>
@@ -375,6 +375,148 @@ function Dashboard({stats,jobs,projects,user,getUser,onViewJobs,onViewMonthly,on
 
 // ── JOBS PAGE ──────────────────────────────────────────────────
 // ── INLINE JOB DETAIL PANEL ────────────────────────────────────
+// ── NOTE CHECKLIST HELPERS ─────────────────────────────────────
+// Notes are stored as JSON string: [{id,text,done,tag},...] or plain text (legacy)
+function parseNotes(raw){
+  if(!raw)return[];
+  try{
+    const p=JSON.parse(raw);
+    if(Array.isArray(p))return p;
+  }catch(e){}
+  // Legacy plain text — split by newline into items
+  return raw.split("\n").filter(l=>l.trim()).map((l,i)=>({
+    id:"n"+i,
+    text:l.replace(/^[✓•\-\*→⚠]\s*/,""),
+    done:l.startsWith("✓"),
+    tag:l.startsWith("⚠")?"blocker":l.startsWith("→")?"next":""
+  }));
+}
+function serializeNotes(items){
+  return JSON.stringify(items);
+}
+// Render notes for display (reports, project view, etc.) — returns HTML string for PDF or JSX for web
+function renderNotesHTML(raw){
+  if(!raw)return"";
+  const items=parseNotes(raw);
+  if(!items.length)return"";
+  const TAG_COLORS={blocker:"#dc2626",next:"#2563eb",info:"#64748b",done:"#16a34a"};
+  return items.map(it=>{
+    const col=it.done?"#16a34a":it.tag==="blocker"?"#dc2626":it.tag==="next"?"#2563eb":"#64748b";
+    const tagHtml=it.tag?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${TAG_COLORS[it.tag]||"#e2e8f0"}22;color:${TAG_COLORS[it.tag]||"#64748b"};font-weight:700;margin-left:4px">${it.tag}</span>`:"";
+    return `<div style="display:flex;align-items:baseline;gap:5px;margin-bottom:2px;font-size:10px;color:${col};text-decoration:${it.done?"line-through":"none"}">${it.done?"☑":"☐"} ${it.text}${tagHtml}</div>`;
+  }).join("");
+}
+function RenderNotesJSX({raw,compact=false}){
+  const items=parseNotes(raw);
+  if(!items.length)return null;
+  const TAG_C={blocker:"#dc2626",next:"#2563eb",info:"#0369a1",done:"#16a34a"};
+  const doneCount=items.filter(i=>i.done).length;
+  return <div>
+    {!compact&&items.length>1&&<div style={{fontSize:10,color:"#94a3b8",marginBottom:3}}>{doneCount}/{items.length} done</div>}
+    {items.map(it=>(
+      <div key={it.id} style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:2}}>
+        <span style={{fontSize:11,color:it.done?"#16a34a":"#94a3b8",flexShrink:0}}>{it.done?"☑":"☐"}</span>
+        <span style={{fontSize:compact?11:12,color:it.done?"#94a3b8":"#374151",textDecoration:it.done?"line-through":"none",flex:1,lineHeight:1.4}}>{it.text}</span>
+        {it.tag&&<span style={{fontSize:9,padding:"1px 5px",borderRadius:3,background:(TAG_C[it.tag]||"#64748b")+"18",color:TAG_C[it.tag]||"#64748b",fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{it.tag}</span>}
+      </div>
+    ))}
+  </div>;
+}
+
+// ── NOTE CHECKLIST EDITOR ──────────────────────────────────────
+function NoteChecklist({raw,onChange,canEdit,lang}){
+  const [items,setItems]=useState(()=>parseNotes(raw));
+  const [newText,setNewText]=useState("");
+  const [newTag,setNewTag]=useState("");
+  const inputRef=useRef(null);
+
+  // Sync upward whenever items change
+  const update=(next)=>{setItems(next);onChange(serializeNotes(next));};
+
+  const toggleDone=(id)=>update(items.map(it=>it.id===id?{...it,done:!it.done}:it));
+  const editText=(id,text)=>update(items.map(it=>it.id===id?{...it,text}:it));
+  const editTag=(id,tag)=>update(items.map(it=>it.id===id?{...it,tag}:it));
+  const removeItem=(id)=>update(items.filter(it=>it.id!==id));
+  const addItem=()=>{
+    if(!newText.trim())return;
+    update([...items,{id:"n"+Date.now(),text:newText.trim(),done:false,tag:newTag}]);
+    setNewText("");setNewTag("");
+    setTimeout(()=>inputRef.current?.focus(),50);
+  };
+  const moveUp=(i)=>{if(i===0)return;const n=[...items];[n[i-1],n[i]]=[n[i],n[i-1]];update(n);};
+  const moveDown=(i)=>{if(i===items.length-1)return;const n=[...items];[n[i],n[i+1]]=[n[i+1],n[i]];update(n);};
+
+  const TAGS=[{v:"",l:"—"},{v:"blocker",l:"🚫 Blocker"},{v:"next",l:"→ Next"},{v:"info",l:"ℹ Info"},{v:"done",l:"✓ Done"}];
+  const TAG_C={blocker:"#dc2626",next:"#2563eb",info:"#0369a1",done:"#16a34a"};
+
+  const doneCount=items.filter(i=>i.done).length;
+
+  return <div style={{display:"flex",flexDirection:"column",gap:0}}>
+    {/* Progress summary */}
+    {items.length>0&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+      <div style={{flex:1,height:5,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${items.length?Math.round(doneCount/items.length*100):0}%`,background:"#16a34a",borderRadius:99,transition:"width 0.3s"}}/>
+      </div>
+      <span style={{fontSize:11,color:"#64748b",fontWeight:600,whiteSpace:"nowrap"}}>{doneCount}/{items.length} {lang==="lo"?"ສໍາເລັດ":"done"}</span>
+    </div>}
+
+    {/* Items list */}
+    <div style={{maxHeight:220,overflowY:"auto",marginBottom:8}}>
+      {items.length===0&&<div style={{color:"#94a3b8",fontSize:12,textAlign:"center",padding:"12px 0"}}>{lang==="lo"?"ຍັງບໍ່ມີລາຍການ":"No items yet — add one below"}</div>}
+      {items.map((it,i)=>(
+        <div key={it.id} style={{display:"flex",alignItems:"flex-start",gap:6,padding:"5px 4px",borderRadius:7,background:it.done?"#f0fdf4":"#fff",marginBottom:3,border:"1px solid",borderColor:it.done?"#bbf7d0":"#f1f5f9",transition:"background 0.15s"}}>
+          {/* Checkbox */}
+          <button onClick={()=>canEdit&&toggleDone(it.id)} disabled={!canEdit}
+            style={{width:20,height:20,borderRadius:4,border:`2px solid ${it.done?"#16a34a":"#d1d5db"}`,background:it.done?"#16a34a":"#fff",flexShrink:0,cursor:canEdit?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",marginTop:2,transition:"all 0.15s"}}>
+            {it.done&&<span style={{color:"#fff",fontSize:11,fontWeight:700,lineHeight:1}}>✓</span>}
+          </button>
+          {/* Text */}
+          <div style={{flex:1,minWidth:0}}>
+            {canEdit
+              ? <input value={it.text} onChange={e=>editText(it.id,e.target.value)}
+                  onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addItem();}if(e.key==="Backspace"&&it.text===""&&items.length>0){e.preventDefault();removeItem(it.id);}}}
+                  style={{...IS,padding:"2px 6px",fontSize:12,textDecoration:it.done?"line-through":"none",color:it.done?"#94a3b8":"#1e293b",background:"transparent",border:"1px solid transparent",borderRadius:4,width:"100%"}}
+                  onFocus={e=>e.target.style.borderColor="#e2e8f0"}
+                  onBlur={e=>e.target.style.borderColor="transparent"}/>
+              : <span style={{fontSize:12,color:it.done?"#94a3b8":"#1e293b",textDecoration:it.done?"line-through":"none",lineHeight:"20px",display:"block",padding:"2px 6px"}}>{it.text}</span>
+            }
+          </div>
+          {/* Tag pill */}
+          {it.tag&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:99,background:(TAG_C[it.tag]||"#64748b")+"18",color:TAG_C[it.tag]||"#64748b",fontWeight:700,flexShrink:0,marginTop:4,whiteSpace:"nowrap"}}>{it.tag}</span>}
+          {/* Actions */}
+          {canEdit&&<div style={{display:"flex",gap:2,flexShrink:0,marginTop:2,opacity:0.5}}>
+            <button onClick={()=>moveUp(i)} title="Move up" style={{width:16,height:16,border:"none",background:"none",cursor:"pointer",fontSize:9,color:"#94a3b8",padding:0,lineHeight:1}}>▲</button>
+            <button onClick={()=>moveDown(i)} title="Move down" style={{width:16,height:16,border:"none",background:"none",cursor:"pointer",fontSize:9,color:"#94a3b8",padding:0,lineHeight:1}}>▼</button>
+            {canEdit&&<select value={it.tag} onChange={e=>editTag(it.id,e.target.value)}
+              style={{fontSize:9,border:"1px solid #e2e8f0",borderRadius:3,padding:"1px 2px",color:"#94a3b8",background:"#fff",cursor:"pointer",height:16}}>
+              {TAGS.map(t=><option key={t.v} value={t.v}>{t.l}</option>)}
+            </select>}
+            <button onClick={()=>removeItem(it.id)} title="Remove" style={{width:16,height:16,border:"none",background:"none",cursor:"pointer",fontSize:11,color:"#fca5a5",padding:0,lineHeight:1}}>✕</button>
+          </div>}
+        </div>
+      ))}
+    </div>
+
+    {/* Add new item row */}
+    {canEdit&&<div style={{display:"flex",gap:5,alignItems:"center",padding:"6px 8px",background:"#f8fafc",borderRadius:8,border:"1px solid #e8edf5"}}>
+      <span style={{fontSize:14,color:"#94a3b8",flexShrink:0}}>+</span>
+      <input ref={inputRef} value={newText} onChange={e=>setNewText(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&addItem()}
+        placeholder={lang==="lo"?"ເພີ່ມລາຍການ...":"Add item... (Enter to add)"}
+        style={{...IS,flex:1,padding:"5px 8px",fontSize:12,background:"transparent",border:"none",outline:"none"}}/>
+      <select value={newTag} onChange={e=>setNewTag(e.target.value)}
+        style={{fontSize:11,border:"1px solid #e2e8f0",borderRadius:6,padding:"4px 6px",color:"#64748b",background:"#fff",cursor:"pointer",flexShrink:0}}>
+        {TAGS.map(t=><option key={t.v} value={t.v}>{t.l}</option>)}
+      </select>
+      <button onClick={addItem} disabled={!newText.trim()}
+        style={{...BS("#2563eb"),padding:"5px 12px",fontSize:12,opacity:newText.trim()?1:0.4}}>
+        {lang==="lo"?"ເພີ່ມ":"Add"}
+      </button>
+    </div>}
+  </div>;
+}
+
+
 function JobDetailPanel({job,user,getUser,projects,lang,onSave,onClose,saving}){
   const t=T[lang];
   const [pg,setPg]=useState(Number(job.progress)||0);
@@ -483,26 +625,18 @@ function JobDetailPanel({job,user,getUser,projects,lang,onSave,onClose,saving}){
           </div>
         </div>
 
-        {/* RIGHT — Notes */}
+        {/* RIGHT — Notes Checklist */}
         <div style={{background:"#fff",borderRadius:10,padding:"14px 16px",border:"1px solid #e8edf5",display:"flex",flexDirection:"column"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>
-              📝 {lang==="lo"?"ໝາຍເຫດ / ຄວາມຄືບໜ້າ":"Notes / Progress Log"}
+              ☑ {lang==="lo"?"ລາຍການ / ຄວາມຄືບໜ້າ":"Checklist / Progress Log"}
             </div>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               {od&&<span style={{fontSize:10,color:"#dc2626",fontWeight:700,background:"#fef2f2",padding:"2px 7px",borderRadius:99}}>⚠ {lang==="lo"?"ເກີນກໍານົດ":"Overdue"}</span>}
               <Badge status={status} lang={lang}/>
             </div>
           </div>
-          {job.notes&&notes!==job.notes&&<div style={{fontSize:11,color:"#94a3b8",marginBottom:8,padding:"6px 8px",background:"#f8fafc",borderRadius:6,border:"1px solid #e8edf5",lineHeight:1.5,maxHeight:60,overflow:"auto"}}>
-            <span style={{fontWeight:700,color:"#94a3b8"}}>Previous: </span>{job.notes}
-          </div>}
-          <textarea value={notes} onChange={e=>canEdit&&mark("notes",e.target.value)}
-            readOnly={!canEdit}
-            style={{...IS,flex:1,minHeight:100,resize:"vertical",fontSize:13,lineHeight:1.6,background:canEdit?"#fff":"#f8fafc",color:"#1e293b"}}
-            placeholder={lang==="lo"
-              ?"ຂຽນຄວາມຄືບໜ້າ, ສິ່ງທີ່ຕິດຂັດ, ຫຼືໝາຍເຫດ...\n\nຕົວຢ່າງ:\n✓ ສຳເລັດການກວດສອບເອກະສານ\n⚠ ລໍຂໍ້ມູນຈາກທີມ HR\n→ ຂັ້ນຕອນຕໍ່ໄປ: ສົ່ງລາຍງານ"
-              :"Write your progress, blockers, or notes...\n\nExamples:\n✓ Completed document review\n⚠ Waiting for data from HR team\n→ Next step: submit final report"}/>
+          <NoteChecklist raw={notes} onChange={v=>{setNotes(v);setDirty(true);}} canEdit={canEdit} lang={lang}/>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,paddingTop:8,borderTop:"1px solid #f1f5f9"}}>
             <div style={{fontSize:11,color:"#94a3b8"}}>{lang==="lo"?"ອັບເດດລ່າສຸດ: ":"Last updated: "}{cleanDate(job.updated_at)}</div>
             {dirty&&<span style={{fontSize:11,color:"#f59e0b",fontWeight:600}}>● {lang==="lo"?"ມີການປ່ຽນແປງ":"Unsaved changes"}</span>}
@@ -1078,7 +1212,7 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
         const projName=projects.find(p=>p.id===pid)?.name||"No Project";
         const rows=pjobs.sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>`
           <tr>
-            <td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>${j.notes?`<div style="font-size:10px;color:#64748b;margin-top:3px">${j.notes}</div>`:""}</td>
+            <td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>${renderNotesHTML(j.notes)}</td>
             <td><span class="badge ${j.status}">${STATUS[j.status]?.en||j.status}</span></td>
             <td class="p ${j.priority}">${j.priority}</td>
             <td>${cleanDate(j.due_date)}</td>
@@ -1174,7 +1308,7 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
                 return <tr key={j.id} style={{borderBottom:"1px solid #f8fafc"}} onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"} onMouseLeave={e=>e.currentTarget.style.background=""}>
                   <td style={{padding:"9px 12px",maxWidth:260}}>
                     <div style={{fontWeight:600,color:"#1e293b"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
-                    {j.notes&&<div style={{fontSize:11,color:"#64748b",marginTop:2,fontStyle:"italic",borderLeft:"2px solid #e2e8f0",paddingLeft:6}}>{j.notes}</div>}
+                    {j.notes&&<RenderNotesJSX raw={j.notes} compact/>}
                   </td>
                   <td style={{padding:"9px 12px"}}><span style={{fontSize:10,padding:"1px 7px",borderRadius:99,background:"#f0f9ff",color:"#0369a1",fontWeight:600}}>{j.category||"—"}</span></td>
                   <td style={{padding:"9px 12px"}}><Badge status={j.status} lang={lang}/></td>
@@ -1231,7 +1365,7 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
         const dn=pj.filter(j=>j.status==="done").length;
         const rows=pj.sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>`
           <tr>
-            <td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>${j.notes?`<div style="font-size:10px;color:#64748b;margin-top:2px;font-style:italic">${j.notes}</div>`:""}</td>
+            <td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>${renderNotesHTML(j.notes)}</td>
             <td>${getUser(j.assignee_id)?.name||"—"}</td>
             <td><span class="badge ${j.status}">${STATUS[j.status]?.en||j.status}</span></td>
             <td class="p ${j.priority}">${j.priority}</td>
@@ -1342,7 +1476,7 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
 
     const printReport=()=>{
       const odRows=overdueAll.map(j=>`<tr>
-        <td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>${j.notes?`<div style="font-size:10px;color:#64748b;margin-top:2px;font-style:italic">${j.notes}</div>`:""}</td>
+        <td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>${renderNotesHTML(j.notes)}</td>
         <td>${getUser(j.assignee_id)?.name||"?"}</td>
         <td>${projects.find(p=>p.id===j.project_id)?.name||"—"}</td>
         <td class="p ${j.priority}">${j.priority}</td>
@@ -1375,7 +1509,7 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
         return <tr key={j.id} style={{borderBottom:"1px solid #f8fafc"}}>
           <td style={{padding:"9px 12px",maxWidth:220}}>
             <div style={{fontWeight:600,color:"#1e293b"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
-            {j.notes&&<div style={{fontSize:11,color:"#64748b",marginTop:2,fontStyle:"italic",borderLeft:"2px solid #e2e8f0",paddingLeft:5}}>{j.notes}</div>}
+            {j.notes&&<RenderNotesJSX raw={j.notes} compact/>}
           </td>
           <td style={{padding:"9px 12px",color:"#64748b",fontSize:11}}>{proj?.name||"—"}</td>
           <td style={{padding:"9px 12px"}}><Avtr user={getUser(j.assignee_id)} size={20} showName/></td>
@@ -1452,7 +1586,7 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
             const od=new Date(String(j.due_date).slice(0,10))<now2&&j.status!=="done";
             return `<tr>
               <td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>
-                ${j.notes?`<div style="font-size:10px;color:#64748b;font-style:italic;margin-top:2px">${j.notes}</div>`:""}
+                ${renderNotesHTML(j.notes)}
               </td>
               <td><span class="badge ${j.status}">${STATUS[j.status]?.en||j.status}</span></td>
               <td class="p ${j.priority}">${j.priority}</td>
@@ -1584,7 +1718,7 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
           return `<tr>
             <td style="${j.status==="done"?"text-decoration:line-through;color:#94a3b8":""}" >
               <strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>
-              ${j.notes?`<div style="font-size:10px;color:#64748b;font-style:italic;margin-top:3px;padding-left:6px;border-left:2px solid #e2e8f0">${j.notes}</div>`:""}
+              ${renderNotesHTML(j.notes)}
             </td>
             <td>${getUser(j.assignee_id)?.name||"—"}</td>
             <td><span class="badge ${j.status}">${STATUS[j.status]?.en||j.status}</span></td>
@@ -1689,7 +1823,7 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
                     <span style={{fontSize:11,color:od?"#dc2626":"#94a3b8",whiteSpace:"nowrap"}}>{od?"⚠ ":""}{cleanDate(j.due_date)}</span>
                   </div>
                   {/* Notes — always shown when they exist */}
-                  {j.notes&&<div style={{marginTop:5,fontSize:12,color:"#475569",background:"#f8fafc",padding:"5px 10px",borderRadius:6,lineHeight:1.6,borderLeft:"3px solid #e2e8f0",fontStyle:"italic"}}>{j.notes}</div>}
+                  {j.notes&&<RenderNotesJSX raw={j.notes} compact/>}
                 </div>
               </div>
             </div>;
@@ -2091,7 +2225,7 @@ function App(){
     <aside style={{width:218,background:"#0f1729",display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden",position:"relative"}}>
       <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at top left,#1e3a5f44,transparent 60%),radial-gradient(ellipse at bottom right,#312e8122,transparent 60%)",pointerEvents:"none"}}/>
       <div style={{padding:"18px 18px 10px",position:"relative",zIndex:1}}>
-        <div style={{fontSize:10,letterSpacing:3,color:"#4a90b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Financial Statement TaskFlow</div>
+        <div style={{fontSize:10,letterSpacing:3,color:"#4a90b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>FS Taskflow v9</div>
         <div style={{fontSize:15,fontWeight:800,color:"#fff",lineHeight:1.3}}>{lang==="lo"?"ການເງິນ &\nບັນຊີ":"Finance &\nAccounting"}</div>
       </div>
       <div style={{padding:"0 18px 10px",position:"relative",zIndex:1,display:"flex",gap:5}}>
