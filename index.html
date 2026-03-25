@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>FS TaskFlow</title>
+<title>Financial Sector</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -990,100 +990,363 @@ function PendingPage({pending,user,getUser,onApprove,onReject,lang}){
 }
 
 // ── TIMELINE PAGE ──────────────────────────────────────────────
-function TimelinePage({projects,jobs,getUser,lang}){
+function TimelinePage({projects,jobs,getUser,users,lang}){
   const t=T[lang];
   const [selProj,setSelProj]=useState("all");
+  const [fUser,setFUser]=useState("all");
+  const [tooltip,setTooltip]=useState(null); // {x,y,content}
   const now=new Date();
-
-  const visibleProjects=selProj==="all"?projects:projects.filter(p=>p.id===selProj);
-
-  // Calculate date range across all visible projects
-  const allDates=[...projects.flatMap(p=>[p.start_date,p.due_date]),...jobs.flatMap(j=>[j.start_date,j.due_date])].filter(Boolean).map(d=>new Date(d));
-  const minDate=allDates.length?new Date(Math.min(...allDates)):new Date();
-  const maxDate=allDates.length?new Date(Math.max(...allDates)):new Date(now.getFullYear(),now.getMonth()+3,1);
-  // Add padding
-  minDate.setDate(1);maxDate.setMonth(maxDate.getMonth()+1,1);
-  const totalDays=Math.max(1,Math.round((maxDate-minDate)/(1000*60*60*24)));
-
-  const pct=(d)=>{if(!d)return 0;const dd=new Date(d);return Math.max(0,Math.min(100,Math.round((dd-minDate)/((maxDate-minDate))*100)));};
-  const wid=(s,e)=>{if(!s||!e)return 0;const sd=new Date(s),ed=new Date(e);return Math.max(0.5,Math.round((ed-sd)/((maxDate-minDate))*100));};
-
-  // Build month headers
-  const months=[];let cur=new Date(minDate);
-  while(cur<maxDate){months.push({label:cur.toLocaleDateString(lang==="lo"?"lo-LA":"en-US",{month:"short",year:"2-digit"}),pct:pct(cur.toISOString().slice(0,10))});cur.setMonth(cur.getMonth()+1);}
-
-  const todayPct=pct(now.toISOString().slice(0,10));
   const sc={active:"#2563eb",planning:"#7c3aed",completed:"#16a34a",paused:"#f59e0b"};
 
+  // Compute date range
+  const allDates=[
+    ...projects.flatMap(p=>[p.start_date,p.due_date]),
+    ...jobs.flatMap(j=>[j.start_date,j.due_date])
+  ].filter(Boolean).map(d=>new Date(String(d).slice(0,10)));
+  const rawMin=allDates.length?new Date(Math.min(...allDates)):new Date();
+  const rawMax=allDates.length?new Date(Math.max(...allDates)):new Date(now.getFullYear(),now.getMonth()+3,1);
+  // Snap to month boundaries + 1 month padding each side
+  const minDate=new Date(rawMin.getFullYear(),rawMin.getMonth()-0,1);
+  const maxDate=new Date(rawMax.getFullYear(),rawMax.getMonth()+2,0); // last day of month after max
+  const totalMs=maxDate-minDate||1;
+  const totalDays=Math.round(totalMs/(1000*60*60*24));
+
+  // Convert date to % position
+  const toX=d=>{
+    if(!d)return null;
+    const dd=new Date(String(d).slice(0,10));
+    return Math.max(0,Math.min(100,(dd-minDate)/totalMs*100));
+  };
+  const toW=(s,e)=>{
+    if(!s||!e)return 0;
+    const sd=new Date(String(s).slice(0,10)),ed=new Date(String(e).slice(0,10));
+    return Math.max(0.3,(ed-sd)/totalMs*100);
+  };
+
+  // Build day tick marks: show every 7 days (weekly) if range ≤ 90 days, else monthly
+  const DAY_MS=1000*60*60*24;
+  const ticks=[];
+  const useWeekly=totalDays<=120;
+  let cur=new Date(minDate);
+  while(cur<=maxDate){
+    const x=toX(cur.toISOString().slice(0,10));
+    const isMonthStart=cur.getDate()===1;
+    const isToday=cur.toDateString()===now.toDateString();
+    ticks.push({
+      x,
+      label:isMonthStart
+        ?cur.toLocaleDateString("en-US",{month:"short",year:"2-digit"})
+        :cur.toLocaleDateString("en-US",{month:"short",day:"numeric"}),
+      isMonth:isMonthStart,
+      isToday,
+      date:new Date(cur)
+    });
+    if(useWeekly){cur=new Date(cur.getTime()+7*DAY_MS);}
+    else{cur.setMonth(cur.getMonth()+1);}
+  }
+
+  const todayX=toX(now.toISOString().slice(0,10));
+
+  const visibleProjects=(selProj==="all"?projects:projects.filter(p=>p.id===selProj));
+
+  // PDF export
+  const printTimeline=()=>{
+    const win=window.open("","_blank");
+    if(!win){notify("Please allow popups","error");return;}
+
+    // Build SVG gantt chart for PDF
+    const SVG_W=900;
+    const LABEL_COL=200;
+    const BAR_W=SVG_W-LABEL_COL-20;
+    const ROW_H=28;
+    const HEADER_H=44;
+
+    // All jobs for visible projects filtered by user
+    const allPjs=visibleProjects.flatMap(p=>jobs.filter(j=>j.project_id===p.id&&(fUser==="all"||j.assignee_id===fUser)));
+    const allDates2=[...visibleProjects.flatMap(p=>[p.start_date,p.due_date]),...allPjs.flatMap(j=>[j.start_date,j.due_date])].filter(Boolean).map(d=>new Date(String(d).slice(0,10)));
+    const svgMin=allDates2.length?new Date(Math.min(...allDates2)):new Date();
+    const svgMax=allDates2.length?new Date(Math.max(...allDates2)):new Date(now.getFullYear(),now.getMonth()+3,1);
+    svgMin.setDate(1);
+    svgMax.setMonth(svgMax.getMonth()+1,1);
+    const svgTotalMs=svgMax-svgMin||1;
+    const toSvgX=d=>{if(!d)return null;return LABEL_COL+Math.max(0,Math.min(BAR_W,(new Date(String(d).slice(0,10))-svgMin)/svgTotalMs*BAR_W));};
+    const toSvgW=(s,e)=>{if(!s||!e)return 0;return Math.max(2,(new Date(String(e).slice(0,10))-new Date(String(s).slice(0,10)))/svgTotalMs*BAR_W);};
+
+    // Month ticks for SVG
+    const svgTicks=[];let svgCur=new Date(svgMin);
+    while(svgCur<=svgMax){svgTicks.push({x:toSvgX(svgCur.toISOString().slice(0,10)),label:svgCur.toLocaleDateString("en-US",{month:"short",year:"2-digit"})});svgCur.setMonth(svgCur.getMonth()+1);}
+
+    const todaySvgX=toSvgX(now.toISOString().slice(0,10));
+
+    // Build SVG rows
+    let rows=[];let y=HEADER_H;
+    const svgBgColors=["#ffffff","#f9fafb"];
+    visibleProjects.forEach((p,pi)=>{
+      const pj=jobs.filter(j=>j.project_id===p.id&&(fUser==="all"||j.assignee_id===fUser));
+      const dn=pj.filter(j=>j.status==="done").length;
+      const pct2=pj.length?Math.round(dn/pj.length*100):0;
+      const projColor={"active":"#2563eb","planning":"#7c3aed","completed":"#16a34a","paused":"#f59e0b"}[p.status]||"#94a3b8";
+      const pname=lang==="lo"&&p.name_lao?p.name_lao:p.name;
+      const px=toSvgX(p.start_date);const pw=toSvgW(p.start_date,p.due_date);
+
+      // Project row
+      rows.push(`<rect x="0" y="${y}" width="${SVG_W}" height="${ROW_H}" fill="#f0f4f8"/>`);
+      rows.push(`<rect x="0" y="${y}" width="4" height="${ROW_H}" fill="${projColor}"/>`);
+      rows.push(`<text x="8" y="${y+ROW_H*0.65}" font-size="11" font-weight="700" fill="#0f172a" font-family="'Noto Sans','Noto Sans Lao',Arial,sans-serif">${pname}</text>`);
+      rows.push(`<text x="8" y="${y+ROW_H*0.9}" font-size="8" fill="#94a3b8" font-family="Arial,sans-serif">${dn}/${pj.length} done · ${pct2}% · Due ${cleanDate(p.due_date)}</text>`);
+      if(px!==null&&pw>0){
+        rows.push(`<rect x="${px}" y="${y+6}" width="${pw}" height="${ROW_H-12}" rx="4" fill="${projColor}" opacity="0.85"/>`);
+        rows.push(`<rect x="${px}" y="${y+6}" width="${Math.min(pw*pct2/100,pw)}" height="${ROW_H-12}" rx="4" fill="white" opacity="0.3"/>`);
+        if(pw>40)rows.push(`<text x="${px+6}" y="${y+ROW_H*0.65}" font-size="9" fill="white" font-weight="700" font-family="Arial,sans-serif">${pct2}%</text>`);
+      }
+      y+=ROW_H;
+
+      // Job rows
+      pj.sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).forEach((j,ji)=>{
+        const jname=lang==="lo"&&j.title_lao?j.title_lao:j.title;
+        const od=new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done";
+        const jColor=j.status==="done"?"#16a34a":od?"#dc2626":{"in-progress":"#2563eb","review":"#7c3aed","todo":"#94a3b8","blocked":"#dc2626"}[j.status]||"#64748b";
+        const pg=Number(j.progress)||0;
+        const jx=toSvgX(j.start_date);const jw=toSvgW(j.start_date,j.due_date);
+        const dueX=toSvgX(j.due_date);
+        rows.push(`<rect x="0" y="${y}" width="${SVG_W}" height="${ROW_H-2}" fill="${svgBgColors[ji%2]}"/>`);
+        rows.push(`<text x="22" y="${y+ROW_H*0.6}" font-size="10" fill="${od?"#dc2626":j.status==="done"?"#94a3b8":"#374151"}" font-family="'Noto Sans','Noto Sans Lao',Arial,sans-serif" text-decoration="${j.status==="done"?"line-through":"none"}">${jname.slice(0,28)}${jname.length>28?"…":""}</text>`);
+        rows.push(`<text x="22" y="${y+ROW_H*0.88}" font-size="8" fill="#94a3b8" font-family="Arial,sans-serif">${STATUS[j.status]?.en||j.status} · ${od?"⚠ ":""}${cleanDate(j.due_date)}</text>`);
+        if(jx!==null&&jw>0){
+          rows.push(`<rect x="${jx}" y="${y+7}" width="${Math.max(jw,2)}" height="${ROW_H-16}" rx="3" fill="${jColor}" opacity="0.15" stroke="${jColor}" stroke-width="1.5"/>`);
+          if(pg>0)rows.push(`<rect x="${jx}" y="${y+7}" width="${Math.max(jw*pg/100,1)}" height="${ROW_H-16}" rx="3" fill="${jColor}" opacity="0.45"/>`);
+        }
+        // Due date diamond
+        if(dueX!==null){
+          rows.push(`<polygon points="${dueX},${y+5} ${dueX+5},${y+ROW_H/2} ${dueX},${y+ROW_H-5} ${dueX-5},${y+ROW_H/2}" fill="${od?"#dc2626":jColor}"/>`);
+          rows.push(`<text x="${dueX+7}" y="${y+ROW_H*0.65}" font-size="8" fill="${od?"#dc2626":"#64748b"}" font-family="Arial,sans-serif">${cleanDate(j.due_date)}</text>`);
+        }
+        y+=ROW_H;
+      });
+    });
+
+    const SVG_H=y+10;
+
+    // Build header row with month ticks
+    const headerRows=[
+      `<rect x="0" y="0" width="${SVG_W}" height="${HEADER_H}" fill="#0f172a"/>`,
+      `<text x="8" y="28" font-size="11" font-weight="700" fill="white" font-family="Arial,sans-serif">Project / Job</text>`,
+      ...svgTicks.map(tk=>[
+        `<line x1="${tk.x}" y1="0" x2="${tk.x}" y2="${SVG_H}" stroke="#e8edf5" stroke-width="0.5" opacity="0.3"/>`,
+        `<text x="${tk.x+3}" y="26" font-size="9" fill="#93c5fd" font-family="Arial,sans-serif">${tk.label}</text>`,
+        `<line x1="${tk.x}" y1="0" x2="${tk.x}" y2="${HEADER_H}" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>`
+      ].join("")),
+    ];
+
+    // Today line
+    if(todaySvgX!==null){
+      rows.push(`<line x1="${todaySvgX}" y1="${HEADER_H}" x2="${todaySvgX}" y2="${SVG_H}" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,3" opacity="0.8"/>`);
+      headerRows.push(`<line x1="${todaySvgX}" y1="0" x2="${todaySvgX}" y2="${HEADER_H}" stroke="#ef4444" stroke-width="2"/>`);
+      headerRows.push(`<text x="${todaySvgX+3}" y="40" font-size="9" fill="#ef4444" font-weight="700" font-family="Arial,sans-serif">TODAY</text>`);
+    }
+
+    const svgContent=`<svg xmlns="http://www.w3.org/2000/svg" width="${SVG_W}" height="${SVG_H}" style="font-family:'Noto Sans',Arial,sans-serif">
+      ${headerRows.join("")}
+      ${rows.join("")}
+    </svg>`;
+
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>FS Taskflow Timeline</title>
+      <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;700&family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet"/>
+      <style>
+        *{box-sizing:border-box}
+        body{font-family:'Noto Sans','Noto Sans Lao',Arial,sans-serif;padding:20px 24px;font-size:12px;color:#1e293b;margin:0}
+        h1{font-size:16px;margin:0 0 4px;color:#0f172a}
+        .meta{color:#64748b;font-size:10px;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:8px}
+        .chart{border:1px solid #e8edf5;border-radius:6px;overflow:hidden;max-width:100%}
+        .legend{display:flex;gap:16px;margin-bottom:12px;font-size:11px;color:#64748b;flex-wrap:wrap}
+        .dot{width:12px;height:12px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:middle}
+        @media print{body{padding:8px 12px}@page{size:A4 landscape;margin:12mm}}
+      </style></head><body>
+      <h1>&#128202; FS Taskflow &mdash; Project Timeline</h1>
+      <div class="meta">Generated: ${now.toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})} &nbsp;|&nbsp; ${fUser==="all"?"All Staff":users.find(u=>u.id===fUser)?.name||""}</div>
+      <div class="legend">
+        <span><span class="dot" style="background:#2563eb"></span>Active</span>
+        <span><span class="dot" style="background:#7c3aed"></span>Planning</span>
+        <span><span class="dot" style="background:#16a34a"></span>Completed</span>
+        <span><span class="dot" style="background:#f59e0b"></span>Paused</span>
+        <span><span style="display:inline-block;width:12px;height:2px;background:#ef4444;vertical-align:middle;margin-right:4px"></span>Today</span>
+        <span>&#9670; = Due date</span>
+      </div>
+      <div class="chart">${svgContent}</div>
+    </body></html>`);
+    win.document.close();
+    setTimeout(()=>win.print(),1000);
+    notify("Timeline PDF ready!");
+  };
+
+  const LABEL_W=200;
+
   return <div style={{animation:"fadeUp 0.3s ease"}}>
-    <div style={{background:"#fff",borderRadius:12,padding:"14px 18px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
-      <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>📊 {lang==="lo"?"ເສັ້ນທາງເວລາໂຄງການ":"Project Timeline"}</div>
-      <select value={selProj} onChange={e=>setSelProj(e.target.value)} style={{...SS,minWidth:180}}>
+    {/* Controls — single compact row */}
+    <div style={{background:"#fff",borderRadius:12,padding:"10px 14px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",gap:8,alignItems:"center",flexWrap:"nowrap",overflowX:"auto"}}>
+      <div style={{fontWeight:700,color:"#0f172a",fontSize:14,flexShrink:0}}>📊 {lang==="lo"?"ເສັ້ນທາງ":"Timeline"}</div>
+      <select value={selProj} onChange={e=>setSelProj(e.target.value)} style={{...SS,minWidth:130,maxWidth:160,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
         <option value="all">{t.allProjects}</option>
         {projects.map(p=><option key={p.id} value={p.id}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</option>)}
       </select>
-      <div style={{marginLeft:"auto",display:"flex",gap:12,fontSize:12,color:"#64748b",flexWrap:"wrap"}}>
-        {Object.entries({active:"#2563eb",planning:"#7c3aed",completed:"#16a34a",paused:"#f59e0b"}).map(([k,c])=><span key={k} style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:10,height:10,borderRadius:2,background:c,display:"inline-block"}}/>{k}</span>)}
+      <select value={fUser} onChange={e=>setFUser(e.target.value)} style={{...SS,minWidth:110,maxWidth:140,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+        <option value="all">{lang==="lo"?"ທຸກຄົນ":"All Staff"}</option>
+        {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+      </select>
+      {/* Compact legend dots */}
+      <div style={{display:"flex",gap:8,flexShrink:0}}>
+        {Object.entries(sc).map(([k,c])=><span key={k} style={{display:"flex",alignItems:"center",gap:3,fontSize:10,color:"#64748b",whiteSpace:"nowrap"}}>
+          <span style={{width:10,height:10,borderRadius:2,background:c,display:"inline-block",flexShrink:0}}/>
+          {k}
+        </span>)}
+        <span style={{display:"flex",alignItems:"center",gap:3,fontSize:10,color:"#64748b",whiteSpace:"nowrap"}}>
+          <span style={{width:2,height:10,background:"#ef4444",display:"inline-block"}}/>Today
+        </span>
       </div>
+      <button onClick={printTimeline} style={{...BS("#dc2626"),padding:"6px 12px",fontSize:11,marginLeft:"auto",flexShrink:0}}>↓ PDF</button>
     </div>
 
-    <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
-      {/* Month headers */}
-      <div style={{display:"flex",borderBottom:"2px solid #e8edf5",position:"relative",paddingLeft:220}}>
-        {months.map((mo,i)=><div key={i} style={{position:"absolute",left:`calc(220px + ${mo.pct}%)`,fontSize:10,color:"#94a3b8",fontWeight:600,paddingTop:6,paddingBottom:6,paddingLeft:4,borderLeft:"1px dashed #e8edf5",whiteSpace:"nowrap"}}>{mo.label}</div>)}
-        <div style={{height:28,flex:1}}/>
-      </div>
-      {/* Today line reference */}
-      <div style={{padding:"0 0 0 220px",position:"relative",minHeight:20}}>
-        <div style={{position:"absolute",left:`calc(220px + ${todayPct}%)`,top:0,bottom:0,width:2,background:"#ef4444",opacity:0.7,zIndex:5,pointerEvents:"none"}}/>
-      </div>
+    {/* Timeline chart */}
+    <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden",position:"relative"}}>
+      {/* Scrollable container */}
+      <div style={{overflowX:"auto"}}>
+        <div style={{minWidth:800,position:"relative"}}>
 
-      {visibleProjects.map(p=>{
-        const pJobs=jobs.filter(j=>j.project_id===p.id);
-        const dn=pJobs.filter(j=>j.status==="done").length;
-        const projPct=pJobs.length?Math.round((dn/pJobs.length)*100):0;
-        const barLeft=pct(p.start_date);const barW=wid(p.start_date,p.due_date);
-        return <div key={p.id}>
-          {/* Project row */}
-          <div style={{display:"flex",alignItems:"center",borderBottom:"1px solid #f1f5f9",background:"#f8fafc"}}>
-            <div style={{width:220,flexShrink:0,padding:"10px 14px"}}>
-              <div style={{fontWeight:700,color:"#0f172a",fontSize:13}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div>
-              <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>{dn}/{pJobs.length} {t.tasksDone} · {projPct}%</div>
+          {/* RULER HEADER */}
+          <div style={{display:"flex",borderBottom:"2px solid #e8edf5",background:"#f8fafc",position:"sticky",top:0,zIndex:10}}>
+            {/* Label column */}
+            <div style={{width:LABEL_W,flexShrink:0,padding:"8px 14px",fontSize:11,fontWeight:700,color:"#94a3b8",borderRight:"1px solid #e8edf5"}}>
+              {lang==="lo"?"ໂຄງການ / ວຽກ":"Project / Job"}
             </div>
-            <div style={{flex:1,position:"relative",height:44,overflow:"hidden"}}>
-              <div style={{position:"absolute",left:`${barLeft}%`,width:`${barW}%`,top:10,height:24,borderRadius:6,background:sc[p.status]||"#94a3b8",display:"flex",alignItems:"center",justifyContent:"center",minWidth:4,boxShadow:"0 1px 3px rgba(0,0,0,0.15)"}}>
-                {barW>8&&<div style={{position:"absolute",inset:0,background:"rgba(255,255,255,0.25)",borderRadius:6,width:`${projPct}%`}}/>}
-                {barW>12&&<span style={{position:"relative",fontSize:10,color:"#fff",fontWeight:700,whiteSpace:"nowrap",padding:"0 6px"}}>{projPct}%</span>}
-              </div>
+            {/* Tick marks */}
+            <div style={{flex:1,position:"relative",height:36,overflow:"hidden"}}>
+              {/* Background grid lines */}
+              {ticks.map((tk,i)=>(
+                <div key={i} style={{position:"absolute",left:`${tk.x}%`,top:0,bottom:0,width:1,background:tk.isMonth?"#e8edf5":"#f1f5f9",zIndex:0}}/>
+              ))}
+              {/* Today red line in header */}
+              {todayX!==null&&<div style={{position:"absolute",left:`${todayX}%`,top:0,bottom:0,width:2,background:"#ef4444",zIndex:3}}/>}
+              {/* Tick labels */}
+              {ticks.filter(tk=>tk.isMonth||useWeekly).map((tk,i)=>(
+                <div key={i} style={{
+                  position:"absolute",left:`${tk.x}%`,top:0,
+                  transform:"translateX(-50%)",
+                  fontSize:tk.isMonth?11:9,
+                  fontWeight:tk.isMonth?700:400,
+                  color:tk.isToday?"#ef4444":tk.isMonth?"#374151":"#94a3b8",
+                  whiteSpace:"nowrap",paddingTop:tk.isMonth?6:10,
+                  background:tk.isToday?"#fff4f4":"transparent",
+                  padding:"4px 3px",borderRadius:3,
+                }}>
+                  {tk.isToday?"TODAY":tk.label}
+                </div>
+              ))}
             </div>
           </div>
-          {/* Job rows */}
-          {pJobs.sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>{
-            const jLeft=pct(j.start_date);const jW=wid(j.start_date,j.due_date);
-            const od=new Date(j.due_date)<now&&j.status!=="done";
-            const jColor=j.status==="done"?"#16a34a":od?"#dc2626":STATUS[j.status]?.c||"#64748b";
-            const pg=Number(j.progress)||0;
-            return <div key={j.id} style={{display:"flex",alignItems:"center",borderBottom:"1px solid #f8fafc"}}>
-              <div style={{width:220,flexShrink:0,padding:"7px 14px 7px 26px"}}>
-                <div style={{fontSize:12,color:"#374151",fontWeight:500}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
-                <div style={{display:"flex",alignItems:"center",gap:5,marginTop:2}}><Badge status={j.status} lang={lang}/><Avtr user={getUser(j.assignee_id)} size={14}/></div>
-              </div>
-              <div style={{flex:1,position:"relative",height:36,overflow:"hidden"}}>
-                <div style={{position:"absolute",left:`${jLeft}%`,width:`${Math.max(jW,0.8)}%`,top:8,height:20,borderRadius:4,background:jColor+"22",border:`1.5px solid ${jColor}`,minWidth:4,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${pg}%`,background:jColor,opacity:0.5,borderRadius:3}}/>
+
+          {/* PROJECT + JOB ROWS */}
+          {visibleProjects.map(p=>{
+            const pJobs=jobs.filter(j=>j.project_id===p.id&&(fUser==="all"||j.assignee_id===fUser));
+            const dn=pJobs.filter(j=>j.status==="done").length;
+            const projPct=pJobs.length?Math.round(dn/pJobs.length*100):0;
+            const projColor=sc[p.status]||"#94a3b8";
+            const pX=toX(p.start_date);
+            const pW=toW(p.start_date,p.due_date);
+
+            return <div key={p.id}>
+              {/* PROJECT ROW */}
+              <div style={{display:"flex",alignItems:"stretch",borderBottom:"1px solid #e8edf5",background:"#f4f6fb"}}>
+                <div style={{width:LABEL_W,flexShrink:0,padding:"10px 14px",borderRight:"1px solid #e8edf5",borderLeft:`4px solid ${projColor}`}}>
+                  <div style={{fontWeight:700,color:"#0f172a",fontSize:13}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}>
+                    <span style={{fontSize:10,padding:"1px 6px",borderRadius:99,background:projColor+"22",color:projColor,fontWeight:700,textTransform:"capitalize"}}>{p.status}</span>
+                    <span style={{fontSize:10,color:"#94a3b8"}}>{dn}/{pJobs.length} · {projPct}%</span>
+                  </div>
                 </div>
-                {jW>6&&<div style={{position:"absolute",left:`calc(${jLeft}% + 4px)`,top:9,fontSize:10,color:jColor,fontWeight:700,whiteSpace:"nowrap"}}>{j.title?.slice(0,20)}{j.title?.length>20?"…":""}</div>}
+                {/* Project Gantt bar */}
+                <div style={{flex:1,position:"relative",height:48,overflow:"visible"}}>
+                  {/* Grid lines */}
+                  {ticks.filter(tk=>tk.isMonth).map((tk,i)=>(
+                    <div key={i} style={{position:"absolute",left:`${tk.x}%`,top:0,bottom:0,width:1,background:"#e8edf5",zIndex:0}}/>
+                  ))}
+                  {todayX!==null&&<div style={{position:"absolute",left:`${todayX}%`,top:0,bottom:0,width:2,background:"#ef4444",opacity:0.5,zIndex:4}}/>}
+                  {pX!==null&&pW>0&&<div
+                    style={{position:"absolute",left:`${pX}%`,width:`${pW}%`,top:10,height:28,borderRadius:6,background:projColor,minWidth:4,boxShadow:"0 2px 6px rgba(0,0,0,0.15)",cursor:"pointer",overflow:"hidden",zIndex:2}}
+                    onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setTooltip({x:r.left+r.width/2,y:r.top-8,content:[`📂 ${lang==="lo"&&p.name_lao?p.name_lao:p.name}`,`Status: ${p.status}`,`Start: ${cleanDate(p.start_date)}`,`Due: ${cleanDate(p.due_date)}`,`Progress: ${projPct}% (${dn}/${pJobs.length})`]});}}
+                    onMouseLeave={()=>setTooltip(null)}>
+                    {/* Progress fill */}
+                    <div style={{position:"absolute",left:0,top:0,height:"100%",width:`${projPct}%`,background:"rgba(255,255,255,0.3)"}}/>
+                    <span style={{position:"absolute",left:6,top:"50%",transform:"translateY(-50%)",fontSize:10,color:"#fff",fontWeight:700,whiteSpace:"nowrap"}}>{p.name?.slice(0,20)} {projPct}%</span>
+                  </div>}
+                  {/* Due date marker */}
+                  {toX(p.due_date)!==null&&<div style={{position:"absolute",left:`${toX(p.due_date)}%`,top:8,width:2,height:32,background:projColor,opacity:0.4,zIndex:3}}/>}
+                </div>
               </div>
-            </div>;})}
-        </div>;})}
-      {visibleProjects.length===0&&<div style={{textAlign:"center",padding:40,color:"#94a3b8"}}>{lang==="lo"?"ບໍ່ມີໂຄງການ":"No projects found"}</div>}
-      {/* Today marker label */}
-      <div style={{paddingLeft:220,position:"relative",height:20}}>
-        <div style={{position:"absolute",left:`calc(220px + ${todayPct}% - 16px)`,bottom:2,fontSize:9,color:"#ef4444",fontWeight:700,whiteSpace:"nowrap"}}>TODAY</div>
+
+              {/* JOB ROWS */}
+              {pJobs.sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>{
+                const jX=toX(j.start_date);
+                const jW=toW(j.start_date,j.due_date);
+                const od=new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done";
+                const jColor=j.status==="done"?"#16a34a":od?"#dc2626":STATUS[j.status]?.c||"#94a3b8";
+                const pg=Number(j.progress)||0;
+                const dueX=toX(j.due_date);
+
+                return <div key={j.id} style={{display:"flex",alignItems:"stretch",borderBottom:"1px solid #f1f5f9",background:j.status==="done"?"#fafffe":"#fff",opacity:j.status==="done"?0.7:1}}>
+                  {/* Label */}
+                  <div style={{width:LABEL_W,flexShrink:0,padding:"7px 10px 7px 22px",borderRight:"1px solid #f1f5f9"}}>
+                    <div style={{fontSize:12,color:j.status==="done"?"#94a3b8":"#374151",fontWeight:500,lineHeight:1.3}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:4,marginTop:2,flexWrap:"wrap"}}>
+                      <Badge status={j.status} lang={lang}/>
+                      <Avtr user={getUser(j.assignee_id)} size={14}/>
+                      {od&&<span style={{fontSize:9,color:"#dc2626",fontWeight:700}}>⚠</span>}
+                    </div>
+                  </div>
+                  {/* Bar area */}
+                  <div style={{flex:1,position:"relative",height:38,overflow:"visible"}}>
+                    {/* Grid */}
+                    {ticks.filter(tk=>tk.isMonth).map((tk,i)=>(
+                      <div key={i} style={{position:"absolute",left:`${tk.x}%`,top:0,bottom:0,width:1,background:"#f5f7fa",zIndex:0}}/>
+                    ))}
+                    {todayX!==null&&<div style={{position:"absolute",left:`${todayX}%`,top:0,bottom:0,width:2,background:"#ef4444",opacity:0.3,zIndex:4}}/>}
+
+                    {/* Job bar */}
+                    {jX!==null&&jW>0&&<div
+                      style={{position:"absolute",left:`${jX}%`,width:`${Math.max(jW,0.5)}%`,top:9,height:20,borderRadius:4,background:jColor+"25",border:`1.5px solid ${jColor}`,minWidth:3,cursor:"pointer",overflow:"hidden",zIndex:2}}
+                      onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setTooltip({x:r.left+r.width/2,y:r.top-8,content:[`${lang==="lo"&&j.title_lao?j.title_lao:j.title}`,`Status: ${STATUS[j.status]?.en||j.status}`,`Priority: ${j.priority}`,`Start: ${cleanDate(j.start_date)}`,`Due: ${od?"⚠ ":""}${cleanDate(j.due_date)}`,`Progress: ${pg}%`,getUser(j.assignee_id)?.name?`Assignee: ${getUser(j.assignee_id).name}`:""]});}}
+                      onMouseLeave={()=>setTooltip(null)}>
+                      {/* Progress fill inside bar */}
+                      <div style={{height:"100%",width:`${pg}%`,background:jColor,opacity:0.5}}/>
+                    </div>}
+
+                    {/* Due date diamond marker */}
+                    {dueX!==null&&<div
+                      style={{position:"absolute",left:`${dueX}%`,top:8,transform:"translateX(-50%)",width:10,height:10,background:od?"#dc2626":jColor,borderRadius:2,transform:"translateX(-50%) rotate(45deg)",zIndex:3,cursor:"pointer"}}
+                      onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setTooltip({x:r.left+5,y:r.top-8,content:[`Due: ${cleanDate(j.due_date)}`,od?"⚠ OVERDUE":"✓ On track"]});}}
+                      onMouseLeave={()=>setTooltip(null)}
+                    />}
+
+                    {/* Date label on bar (if wide enough) */}
+                    {jW>8&&<span style={{position:"absolute",left:`${jX}%`,top:10,fontSize:9,color:jColor,fontWeight:600,whiteSpace:"nowrap",marginLeft:3,zIndex:5}}>{cleanDate(j.due_date)}</span>}
+                  </div>
+                </div>;
+              })}
+            </div>;
+          })}
+
+          {visibleProjects.length===0&&<div style={{textAlign:"center",padding:40,color:"#94a3b8"}}>{t.noJobs}</div>}
+        </div>
       </div>
     </div>
+
+    {/* Hover tooltip */}
+    {tooltip&&<div style={{position:"fixed",left:tooltip.x,top:tooltip.y,transform:"translate(-50%,-100%)",background:"#0f172a",color:"#fff",borderRadius:8,padding:"8px 12px",fontSize:11,zIndex:9999,pointerEvents:"none",boxShadow:"0 4px 16px rgba(0,0,0,0.3)",maxWidth:220,whiteSpace:"pre-line"}}>
+      {tooltip.content.filter(Boolean).join("\n")}
+      <div style={{position:"absolute",bottom:-5,left:"50%",transform:"translateX(-50%)",width:10,height:10,background:"#0f172a",borderRadius:2,transform:"translateX(-50%) rotate(45deg)"}}/>
+    </div>}
   </div>;
 }
+
 
 // ── REPORTS PAGE ───────────────────────────────────────────────
 function ReportsPage({jobs,projects,users,user,getUser,lang}){
@@ -1160,27 +1423,33 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
   // ── PDF export ─────────────────────────────────────────────
   const exportReport=(title,html)=>{
     const win=window.open("","_blank");
-    win.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
+    if(!win){notify("Please allow popups","error");return;}
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;700&family=Noto+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
     <style>
-      body{font-family:'Segoe UI',sans-serif;padding:28px;color:#1e293b;font-size:12px;}
-      h1{font-size:20px;color:#0f172a;margin-bottom:4px;}
-      h2{font-size:14px;color:#374151;margin:18px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;}
-      .meta{color:#64748b;font-size:11px;margin-bottom:20px;}
-      table{width:100%;border-collapse:collapse;margin-bottom:16px;}
-      th{background:#0f172a;color:#fff;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;}
-      td{padding:7px 10px;border-bottom:1px solid #e2e8f0;}
-      tr:nth-child(even){background:#f8fafc;}
-      .badge{padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;}
-      .done{background:#f0fdf4;color:#16a34a;}.in-progress{background:#eff6ff;color:#2563eb;}
-      .todo{background:#f1f5f9;color:#64748b;}.blocked{background:#fef2f2;color:#dc2626;}
-      .stat-grid{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;}
-      .stat{background:#f8fafc;border-radius:8px;padding:10px 14px;flex:1;min-width:100px;border-top:3px solid #3b82f6;}
-      .stat .n{font-size:22px;font-weight:800;color:#0f172a;}
-      .stat .l{font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:600;}
-      @media print{body{padding:14px;}}
+      *{box-sizing:border-box}
+      body{font-family:'Noto Sans','Noto Sans Lao',Arial,sans-serif;padding:24px 28px;color:#1e293b;font-size:12px;line-height:1.6}
+      h1{font-size:18px;color:#0f172a;margin:0 0 4px;font-weight:800}
+      h2{font-size:13px;color:#374151;margin:16px 0 6px;border-bottom:2px solid #e2e8f0;padding-bottom:4px;font-weight:700}
+      h3{font-size:12px;color:#374151;margin:10px 0 4px;font-weight:600}
+      .meta{color:#64748b;font-size:10px;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #e2e8f0}
+      table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:11px}
+      th{background:#0f172a;color:#fff;padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;font-family:'Noto Sans',Arial,sans-serif}
+      td{padding:6px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+      tr:nth-child(even) td{background:#f8fafc}
+      .badge{padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;display:inline-block}
+      .done{background:#f0fdf4;color:#16a34a}.in-progress{background:#eff6ff;color:#2563eb}
+      .todo{background:#f1f5f9;color:#64748b}.blocked{background:#fef2f2;color:#dc2626}
+      .review{background:#f5f3ff;color:#7c3aed}
+      .stat-grid{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+      .stat{background:#f8fafc;border-radius:6px;padding:10px 14px;flex:1;min-width:90px;border-top:3px solid #3b82f6}
+      .stat .n{font-size:20px;font-weight:800;color:#0f172a;font-family:'Noto Sans',Arial,sans-serif}
+      .stat .l{font-size:9px;color:#94a3b8;text-transform:uppercase;font-weight:600;letter-spacing:0.5px}
+      p.note{font-size:10px;color:#64748b;font-style:italic;margin:2px 0 12px}
+      @media print{body{padding:10px 14px}@page{margin:12mm}}
     </style></head><body>${html}</body></html>`);
     win.document.close();
-    setTimeout(()=>win.print(),500);
+    setTimeout(()=>win.print(),900);
   };
 
   // ── TAB: PERSONAL ──────────────────────────────────────────
@@ -2197,7 +2466,58 @@ function App(){
   const deleteNote=async(id)=>{if(!window.confirm("Delete note?"))return;try{await apiPost({action:"deleteBoardNote",id});setBoard(p=>p.filter(n=>n.id!==id));notify("Deleted","info");}catch(e){notify("Error","error");}};
 
   const exportCSV=()=>{const rows=[["ID","Project","Title EN","Title Lao","Category","Assignee","Status","Priority","Start","Due","Est.Hrs","Act.Hrs","Progress%","Notes"],...jobs.map(j=>[j.id,projects.find(p=>p.id===j.project_id)?.name||"",j.title,j.title_lao||"",j.category,getUser(j.assignee_id)?.name||"",STATUS[j.status]?.en||j.status,PRIORITY[j.priority]?.en||j.priority,j.start_date,j.due_date,j.estimated_hours,j.actual_hours||0,j.progress||0,j.notes||""])];const csv=rows.map(r=>r.map(c=>`"${String(c||"").replace(/"/g,'""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}));a.download="taskflow_report.csv";a.click();notify("CSV exported!");};
-  const exportPDF=()=>{const win=window.open("","_blank");const rows=jobs.map(j=>`<tr><td>${projects.find(p=>p.id===j.project_id)?.name||""}</td><td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong><br/><small>${j.category||""}</small></td><td>${getUser(j.assignee_id)?.name||"-"}</td><td class="b ${j.status}">${STATUS[j.status]?.[lang]||j.status}</td><td class="p ${j.priority}">${PRIORITY[j.priority]?.[lang]||j.priority}</td><td>${j.due_date}</td><td>${j.progress||0}%</td></tr>`).join("");win.document.write(`<!DOCTYPE html><html><head><title>Report</title><style>body{font-family:sans-serif;padding:24px;font-size:12px}table{width:100%;border-collapse:collapse}th{background:#0f172a;color:#fff;padding:8px;text-align:left;font-size:10px;text-transform:uppercase}td{padding:7px;border-bottom:1px solid #e2e8f0}tr:nth-child(even){background:#f8fafc}.b{padding:2px 6px;border-radius:99px;font-size:10px;font-weight:700}.todo{background:#f1f5f9;color:#64748b}.in-progress{background:#eff6ff;color:#2563eb}.review{background:#f5f3ff;color:#7c3aed}.done{background:#f0fdf4;color:#16a34a}.blocked{background:#fef2f2;color:#dc2626}.p{font-weight:700}.urgent{color:#dc2626}.high{color:#f97316}.medium{color:#f59e0b}.low{color:#94a3b8}</style></head><body><h2>Finance Report — ${new Date().toLocaleDateString()} · ${user.name}</h2><table><thead><tr><th>Project</th><th>Job</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due</th><th>Progress</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);win.document.close();setTimeout(()=>win.print(),400);notify("PDF ready!");};
+  const exportPDF=()=>{
+    const win=window.open("","_blank");
+    if(!win){notify("Please allow popups","error");return;}
+    const grouped={};
+    jobs.forEach(j=>{const k=j.project_id||"__none__";if(!grouped[k])grouped[k]=[];grouped[k].push(j);});
+    const projSections=Object.entries(grouped).map(([pid,pjobs])=>{
+      const proj=projects.find(p=>p.id===pid);
+      const pname=(lang==="lo"&&proj?.name_lao?proj.name_lao:proj?.name)||"No Project";
+      const rows2=pjobs.sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>{
+        const od=new Date(String(j.due_date).slice(0,10))<new Date()&&j.status!=="done";
+        const notes=renderNotesHTML(j.notes);
+        const jname=lang==="lo"&&j.title_lao?j.title_lao:j.title;
+        return `<tr>
+          <td><strong>${jname}</strong>${j.category?`<br/><small style="color:#64748b">${j.category}</small>`:""}${notes?`<div style="margin-top:4px">${notes}</div>`:""}
+          </td>
+          <td>${getUser(j.assignee_id)?.name||"-"}</td>
+          <td><span class="b ${j.status}">${STATUS[j.status]?.en||j.status}</span></td>
+          <td class="p ${j.priority}">${PRIORITY[j.priority]?.en||j.priority}</td>
+          <td style="color:${od?"#dc2626":"inherit"};font-weight:${od?700:400}">${od?"&#9888; ":""}${cleanDate(j.due_date)}</td>
+          <td>${j.progress||0}%</td>
+        </tr>`;}).join("");
+      return `<h2>${pname}</h2>
+        <table><thead><tr><th>Job / Notes</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due</th><th>%</th></tr></thead><tbody>${rows2}</tbody></table>`;
+    }).join("");
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>FS Taskflow Report</title>
+      <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;700&family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet"/>
+      <style>
+        *{box-sizing:border-box}
+        body{font-family:'Noto Sans','Noto Sans Lao',Arial,sans-serif;padding:20px 28px;font-size:12px;color:#1e293b;line-height:1.5}
+        h1{font-size:17px;margin:0 0 4px;color:#0f172a}
+        h2{font-size:13px;margin:18px 0 5px;padding:7px 12px;background:#f0f4f8;border-left:4px solid #2563eb;border-radius:0 4px 4px 0;page-break-inside:avoid}
+        .meta{color:#64748b;font-size:10px;margin-bottom:18px;border-bottom:1px solid #e2e8f0;padding-bottom:8px}
+        table{width:100%;border-collapse:collapse;margin-bottom:6px;font-size:11px}
+        th{background:#0f172a;color:#fff;padding:6px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.5px}
+        td{padding:6px 10px;border-bottom:1px solid #e8edf5;vertical-align:top}
+        tr:nth-child(even) td{background:#f9fafb}
+        .b{padding:2px 7px;border-radius:99px;font-size:10px;font-weight:700;display:inline-block}
+        .todo{background:#f1f5f9;color:#64748b}.in-progress{background:#eff6ff;color:#2563eb}
+        .review{background:#f5f3ff;color:#7c3aed}.done{background:#f0fdf4;color:#16a34a}
+        .blocked{background:#fef2f2;color:#dc2626}
+        .p{font-weight:700}.urgent{color:#dc2626}.high{color:#f97316}.medium{color:#f59e0b}.low{color:#94a3b8}
+        @media print{body{padding:10px 14px}h2{page-break-before:auto}}
+      </style></head><body>
+      <h1>FS Taskflow &mdash; All Jobs Report</h1>
+      <div class="meta">Generated: ${new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})} &nbsp;|&nbsp; ${user.name}</div>
+      ${projSections}
+    </body></html>`);
+    win.document.close();
+    // Wait for font to load before printing
+    setTimeout(()=>win.print(),900);
+    notify("PDF ready!");
+  };
 
   if(!user) return <Login onLogin={handleLogin} lang={lang} setLang={setLang}/>;
 
@@ -2225,8 +2545,8 @@ function App(){
     <aside style={{width:218,background:"#0f1729",display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden",position:"relative"}}>
       <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at top left,#1e3a5f44,transparent 60%),radial-gradient(ellipse at bottom right,#312e8122,transparent 60%)",pointerEvents:"none"}}/>
       <div style={{padding:"18px 18px 10px",position:"relative",zIndex:1}}>
-        <div style={{fontSize:10,letterSpacing:3,color:"#4a90b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>FS Taskflow v9</div>
-        <div style={{fontSize:15,fontWeight:800,color:"#fff",lineHeight:1.3}}>{lang==="lo"?"ການເງິນ &\nບັນຊີ":"Finance &\nAccounting"}</div>
+        <div style={{fontSize:10,letterSpacing:3,color:"#4a90b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>FS Taskflow</div>
+        <div style={{fontSize:15,fontWeight:800,color:"#fff",lineHeight:1.3}}>"FS Taskflow"</div>
       </div>
       <div style={{padding:"0 18px 10px",position:"relative",zIndex:1,display:"flex",gap:5}}>
         {["en","lo"].map(l=><button key={l} onClick={()=>setLang(l)} style={{flex:1,padding:"4px",borderRadius:5,border:"1px solid rgba(255,255,255,0.1)",background:lang===l?"rgba(59,130,246,0.25)":"transparent",color:lang===l?"#93c5fd":"#475569",fontSize:11,fontWeight:600}}>{l==="en"?"EN":"ລາວ"}</button>)}
@@ -2272,7 +2592,7 @@ function App(){
         {page==="team"&&<TeamPage users={users} jobs={jobs} user={user} onAddUser={()=>setModal({type:"addUser"})} onEditUser={u=>setModal({type:"editUser",data:u})} onDeleteUser={deleteUser} lang={lang}/>}
         {page==="monthly"&&<MonthlyPage monthly={monthly} jobs={jobs} user={user} users={users} projects={projects} getUser={getUser} onSaveTemplate={saveTemplate} onDeleteTemplate={deleteTemplate} onGenerate={generateMonthly} lang={lang} generating={generating}/>}
         {page==="pending"&&<PendingPage pending={pending} user={user} getUser={getUser} onApprove={approveJob} onReject={rejectJob} lang={lang}/>}
-        {page==="timeline"&&<TimelinePage projects={projects} jobs={jobs} getUser={getUser} lang={lang}/>}
+        {page==="timeline"&&<TimelinePage projects={projects} jobs={jobs} getUser={getUser} users={users} lang={lang}/>}
         {page==="board"&&<BoardPage board={board} user={user} users={users} getUser={getUser} onAddNote={addNote} onEditNote={editNote} onDeleteNote={deleteNote} lang={lang}/>}
         {page==="reports"&&<ReportsPage jobs={jobs} projects={projects} users={users} user={user} getUser={getUser} lang={lang}/>}
       </div>
