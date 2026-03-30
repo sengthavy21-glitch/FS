@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Financial Sector</title>
+<title>FS Taskflow</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -824,8 +824,12 @@ function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,p
                         {user.role==="leader"&&<div style={{display:"flex",gap:4}}>
                           <button onClick={()=>onEdit(j)} style={{...BS("#2563eb"),padding:"4px 8px",fontSize:11}}>{t.edit}</button>
                           <button onClick={()=>onDelete(j.id)} style={{...BS("#dc2626"),padding:"4px 8px",fontSize:11}}>{t.del}</button>
+                          <button onClick={()=>printJobCard(j,projects,getUser,lang)} title="Print Card" style={{width:26,height:26,borderRadius:6,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}>🖨</button>
                         </div>}
-                        {user.role!=="leader"&&j.assignee_id===user.id&&<span style={{fontSize:10,color:"#94a3b8"}}>↕ expand</span>}
+                        {user.role!=="leader"&&j.assignee_id===user.id&&<div style={{display:"flex",gap:4,alignItems:"center"}}>
+                          <span style={{fontSize:10,color:"#94a3b8"}}>↕ expand</span>
+                          <button onClick={()=>printJobCard(j,projects,getUser,lang)} title="Print Card" style={{width:22,height:22,borderRadius:5,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>🖨</button>
+                        </div>}
                       </div>
                     </div>
                     {/* EXPANDED DETAIL PANEL */}
@@ -2326,6 +2330,471 @@ function JobRequestModal({onClose,onSave,projects,users,user,lang,saving}){
   </Modal>;
 }
 
+// ── PRINT JOB CARD (standalone PDF for a single job) ──────────
+function printJobCard(job,projects,getUser,lang){
+  const win=window.open("","_blank");
+  if(!win)return;
+  const assignee=getUser(job.assignee_id);
+  const proj=projects.find(p=>p.id===job.project_id);
+  const od=new Date(String(job.due_date).slice(0,10))<new Date()&&job.status!=="done";
+  const pg=Number(job.progress)||0;
+  const pgColor=pg===100?"#16a34a":pg>=70?"#2563eb":pg>=30?"#f59e0b":"#dc2626";
+  const statusC={"todo":"#64748b","in-progress":"#2563eb","review":"#7c3aed","done":"#16a34a","blocked":"#dc2626"};
+  const priC={"urgent":"#dc2626","high":"#f97316","medium":"#f59e0b","low":"#94a3b8"};
+  const notes=renderNotesHTML(job.notes);
+  const circ=2*Math.PI*40;
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Job Card</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;700&family=Noto+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Noto Sans','Noto Sans Lao',Arial,sans-serif;padding:28px 32px;color:#1e293b;font-size:12px;line-height:1.6;max-width:720px}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:14px;border-bottom:3px solid ${statusC[job.status]||"#94a3b8"}}
+    .title{font-size:20px;font-weight:800;color:#0f172a;line-height:1.2;margin-bottom:6px}
+    .title-lao{font-size:14px;color:#64748b;margin-bottom:8px}
+    .badges{display:flex;gap:6px;flex-wrap:wrap}
+    .badge{padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;display:inline-block}
+    .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+    .meta-item{background:#f8fafc;border-radius:8px;padding:10px 14px}
+    .meta-label{font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px}
+    .meta-value{font-size:13px;font-weight:600;color:#1e293b}
+    .section{margin-bottom:16px}
+    .section-title{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #f1f5f9}
+    .progress-bar{height:10px;background:#f1f5f9;border-radius:99px;overflow:hidden;margin-bottom:4px}
+    .progress-fill{height:100%;background:${pgColor};border-radius:99px}
+    .logo{font-size:10px;color:#94a3b8;text-align:right}
+    @media print{body{padding:14px 18px}@page{size:A4;margin:15mm}}
+  </style></head><body>
+  <div class="header">
+    <div style="flex:1">
+      <div class="title">${lang==="lo"&&job.title_lao?job.title_lao:job.title}</div>
+      ${job.title_lao&&lang!=="lo"?`<div class="title-lao">${job.title_lao}</div>`:""}
+      <div class="badges">
+        <span class="badge" style="background:${statusC[job.status]||"#94a3b8"}22;color:${statusC[job.status]||"#94a3b8"}">${STATUS[job.status]?.en||job.status}</span>
+        <span class="badge" style="color:${priC[job.priority]||"#94a3b8"};background:${priC[job.priority]||"#94a3b8"}18">● ${job.priority?.toUpperCase()}</span>
+        ${job.category?`<span class="badge" style="background:#f0f9ff;color:#0369a1">${job.category}</span>`:""}
+        ${od?`<span class="badge" style="background:#fef2f2;color:#dc2626">⚠ OVERDUE</span>`:""}
+      </div>
+    </div>
+    <div style="text-align:center;margin-left:20px">
+      <svg width="90" height="90" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="40" fill="none" stroke="#f1f5f9" stroke-width="12"/>
+        <circle cx="50" cy="50" r="40" fill="none" stroke="${pgColor}" stroke-width="12"
+          stroke-dasharray="${circ}" stroke-dashoffset="${circ*(1-pg/100)}"
+          stroke-linecap="round" transform="rotate(-90 50 50)"/>
+        <text x="50" y="55" text-anchor="middle" font-size="20" font-weight="800" fill="#0f172a" font-family="Arial">${pg}%</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-item">
+      <div class="meta-label">Project</div>
+      <div class="meta-value">${lang==="lo"&&proj?.name_lao?proj.name_lao:proj?.name||"—"}</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Assignee</div>
+      <div class="meta-value">${assignee?.name||"—"} <span style="font-size:10px;color:#64748b">${assignee?.department||""}</span></div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Start Date</div>
+      <div class="meta-value">${cleanDate(job.start_date)}</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Due Date</div>
+      <div class="meta-value" style="color:${od?"#dc2626":"#1e293b"}">${od?"⚠ ":""}${cleanDate(job.due_date)}</div>
+    </div>
+  </div>
+
+  ${job.description?`<div class="section"><div class="section-title">Description</div><div style="color:#374151;line-height:1.7">${job.description}</div></div>`:""}
+
+  <div class="section">
+    <div class="section-title">Progress</div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${pg}%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin-top:3px"><span>${pg}% complete</span><span>Est. ${job.estimated_hours||0}h</span></div>
+  </div>
+
+  ${notes?`<div class="section"><div class="section-title">Checklist / Notes</div>${notes}</div>`:""}
+
+  <div style="margin-top:20px;padding-top:10px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;font-size:9px;color:#94a3b8">
+    <span>FS Taskflow &nbsp;|&nbsp; Job ID: ${job.id}</span>
+    <span>Last updated: ${cleanDate(job.updated_at)} &nbsp;|&nbsp; Printed: ${new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"})}</span>
+  </div>
+  </body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(),900);
+}
+
+// ── DUE TODAY BANNER ───────────────────────────────────────────
+function DueTodayBanner({jobs,user,lang,onOpenJob}){
+  const [dismissed,setDismissed]=useState(false);
+  const todayStr=new Date().toISOString().slice(0,10);
+  const myJobs=jobs.filter(j=>j.assignee_id===user.id||user.role==="leader");
+  const dueToday=myJobs.filter(j=>String(j.due_date).slice(0,10)===todayStr&&j.status!=="done");
+  const overdue=myJobs.filter(j=>String(j.due_date).slice(0,10)<todayStr&&j.status!=="done");
+  if(dismissed||(!dueToday.length&&!overdue.length))return null;
+  const PO2={urgent:0,high:1,medium:2,low:3};
+  const sorted=[...dueToday,...overdue].sort((a,b)=>(PO2[a.priority]||9)-(PO2[b.priority]||9)).slice(0,6);
+  return (
+    <div style={{position:"fixed",top:16,right:16,zIndex:8888,width:340,background:"#fff",borderRadius:14,boxShadow:"0 8px 32px rgba(0,0,0,0.16)",border:"1px solid #e8edf5",animation:"fadeUp 0.3s ease",overflow:"hidden"}}>
+      {/* Header */}
+      <div style={{background:overdue.length?"linear-gradient(135deg,#7f1d1d,#dc2626)":"linear-gradient(135deg,#1e3a5f,#2563eb)",padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{color:"#fff",fontWeight:700,fontSize:13}}>
+            {overdue.length?"⚠ "+overdue.length+" Overdue":"🔔 Due Today"}
+            {dueToday.length>0&&overdue.length>0&&` · ${dueToday.length} today`}
+          </div>
+          <div style={{color:"rgba(255,255,255,0.7)",fontSize:10,marginTop:1}}>
+            {lang==="lo"?"ຕ້ອງການຄວາມສົນໃຈ":"Needs your attention"}
+          </div>
+        </div>
+        <button onClick={()=>setDismissed(true)} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:6,padding:"4px 8px",fontSize:12,cursor:"pointer"}}>✕</button>
+      </div>
+      {/* Job list */}
+      <div style={{maxHeight:280,overflowY:"auto"}}>
+        {sorted.map(j=>{
+          const isOd=String(j.due_date).slice(0,10)<todayStr;
+          const priC={urgent:"#dc2626",high:"#f97316",medium:"#f59e0b",low:"#94a3b8"};
+          return <div key={j.id} onClick={()=>onOpenJob(j)} style={{padding:"10px 14px",borderBottom:"1px solid #f1f5f9",cursor:"pointer",display:"flex",alignItems:"center",gap:10,transition:"background 0.1s"}}
+            onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"}
+            onMouseLeave={e=>e.currentTarget.style.background=""}>
+            <div style={{width:4,height:36,borderRadius:2,background:isOd?"#dc2626":priC[j.priority]||"#94a3b8",flexShrink:0}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:600,color:"#1e293b",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+              <div style={{fontSize:10,color:isOd?"#dc2626":"#94a3b8",marginTop:1}}>
+                {isOd?"⚠ Overdue · ":"Due today · "}{cleanDate(j.due_date)} · {Number(j.progress)||0}%
+              </div>
+            </div>
+            <span style={{fontSize:10,color:"#94a3b8",flexShrink:0}}>→</span>
+          </div>;
+        })}
+      </div>
+      {sorted.length===0&&<div style={{padding:16,textAlign:"center",color:"#94a3b8",fontSize:12}}>✅ All clear!</div>}
+    </div>
+  );
+}
+
+// ── MY WORK PAGE ───────────────────────────────────────────────
+function MyWorkPage({jobs,projects,user,getUser,onEdit,onInlineUpdate,lang,saving}){
+  const [expandedId,setExpandedId]=useState(null);
+  const todayStr=new Date().toISOString().slice(0,10);
+  const now=new Date();
+  const mine=jobs.filter(j=>j.assignee_id===user.id);
+
+  const groups=[
+    {id:"overdue",label:lang==="lo"?"⚠ ເກີນກໍານົດ":"⚠ Overdue",color:"#dc2626",bg:"#fef2f2",jobs:mine.filter(j=>String(j.due_date).slice(0,10)<todayStr&&j.status!=="done").sort((a,b)=>new Date(a.due_date)-new Date(b.due_date))},
+    {id:"today",label:lang==="lo"?"🔴 ຄົບກໍານົດວັນນີ້":"🔴 Due Today",color:"#f59e0b",bg:"#fffbeb",jobs:mine.filter(j=>String(j.due_date).slice(0,10)===todayStr&&j.status!=="done")},
+    {id:"week",label:lang==="lo"?"📅 ອາທິດນີ້":"📅 This Week",color:"#2563eb",bg:"#eff6ff",jobs:mine.filter(j=>{const d=new Date(String(j.due_date).slice(0,10));const diff=Math.round((d-now)/(1000*60*60*24));return diff>0&&diff<=7&&j.status!=="done";}).sort((a,b)=>new Date(a.due_date)-new Date(b.due_date))},
+    {id:"later",label:lang==="lo"?"🗓 ຕໍ່ໄປ":"🗓 Coming Up",color:"#7c3aed",bg:"#f5f3ff",jobs:mine.filter(j=>{const d=new Date(String(j.due_date).slice(0,10));const diff=Math.round((d-now)/(1000*60*60*24));return diff>7&&j.status!=="done";}).sort((a,b)=>new Date(a.due_date)-new Date(b.due_date))},
+    {id:"done",label:lang==="lo"?"✅ ສໍາເລັດແລ້ວ":"✅ Done",color:"#16a34a",bg:"#f0fdf4",jobs:mine.filter(j=>j.status==="done").sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at)).slice(0,10)},
+  ];
+
+  const total=mine.length,done=mine.filter(j=>j.status==="done").length;
+
+  const JobRow=({j,groupColor})=>{
+    const od=String(j.due_date).slice(0,10)<todayStr&&j.status!=="done";
+    const pg=Number(j.progress)||0;
+    const isEx=expandedId===j.id;
+    const proj=projects.find(p=>p.id===j.project_id);
+    return <div style={{borderBottom:"1px solid #f1f5f9"}}>
+      <div onClick={()=>setExpandedId(isEx?null:j.id)}
+        style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",cursor:"pointer",background:isEx?"#f0f9ff":"",transition:"background 0.1s"}}
+        onMouseEnter={e=>{if(!isEx)e.currentTarget.style.background="#f8fafc";}}
+        onMouseLeave={e=>{if(!isEx)e.currentTarget.style.background="";}}>
+        <span style={{fontSize:9,color:"#94a3b8",transform:isEx?"rotate(90deg)":"",transition:"transform 0.2s",flexShrink:0}}>▶</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:600,color:j.status==="done"?"#94a3b8":"#1e293b",fontSize:13,textDecoration:j.status==="done"?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+          <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{proj?.name||""}{j.category?" · "+j.category:""}</div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:3}}>
+            <div style={{width:50,height:4,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":groupColor,borderRadius:99}}/></div>
+            <span style={{fontSize:10,color:"#64748b",fontWeight:600}}>{pg}%</span>
+          </div>
+          <span style={{fontSize:11,color:od?"#dc2626":"#94a3b8",fontWeight:od?700:400,whiteSpace:"nowrap"}}>{od?"⚠ ":""}{cleanDate(j.due_date)}</span>
+          <Badge status={j.status} lang={lang}/>
+          {user.role==="leader"&&<button onClick={e=>{e.stopPropagation();onEdit(j);}} style={{...BS("#2563eb"),padding:"3px 8px",fontSize:10}}>Edit</button>}
+          <button onClick={e=>{e.stopPropagation();printJobCard(j,projects,getUser,lang);}} title="Print Job Card" style={{width:24,height:24,borderRadius:6,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}>🖨</button>
+        </div>
+      </div>
+      {isEx&&<JobDetailPanel job={j} user={user} getUser={getUser} projects={projects} lang={lang} saving={saving}
+        onSave={updated=>{onInlineUpdate(updated);setExpandedId(null);}}
+        onClose={()=>setExpandedId(null)}/>}
+    </div>;
+  };
+
+  return <div style={{animation:"fadeUp 0.3s ease"}}>
+    {/* My stats row */}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:16}}>
+      {[
+        {l:lang==="lo"?"ວຽກທັງໝົດ":"Total",v:total,c:"#2563eb"},
+        {l:lang==="lo"?"ເກີນກໍານົດ":"Overdue",v:groups[0].jobs.length,c:"#dc2626"},
+        {l:lang==="lo"?"ວັນນີ້":"Today",v:groups[1].jobs.length,c:"#f59e0b"},
+        {l:lang==="lo"?"ອາທິດນີ້":"This Week",v:groups[2].jobs.length,c:"#7c3aed"},
+        {l:lang==="lo"?"ສໍາເລັດ":"Done",v:done,c:"#16a34a"},
+      ].map(s=><div key={s.l} style={{background:"#fff",borderRadius:12,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`3px solid ${s.c}`,textAlign:"center"}}>
+        <div style={{fontSize:24,fontWeight:800,color:s.c}}>{s.v}</div>
+        <div style={{fontSize:11,color:"#94a3b8",fontWeight:600,textTransform:"uppercase",marginTop:2}}>{s.l}</div>
+      </div>)}
+    </div>
+
+    {/* Progress summary */}
+    <div style={{background:"#fff",borderRadius:12,padding:"12px 18px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",alignItems:"center",gap:14}}>
+      <Avtr user={user} size={40}/>
+      <div style={{flex:1}}>
+        <div style={{fontWeight:700,color:"#0f172a",fontSize:14}}>{user.name} — {lang==="lo"?"ວຽກຂອງຂ້ອຍ":"My Work"}</div>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
+          <div style={{flex:1,height:8,background:"#f1f5f9",borderRadius:99,overflow:"hidden",maxWidth:240}}>
+            <div style={{height:"100%",width:`${total?Math.round(done/total*100):0}%`,background:"#16a34a",borderRadius:99,transition:"width 0.6s"}}/>
+          </div>
+          <span style={{fontSize:12,color:"#64748b"}}>{total?Math.round(done/total*100):0}% {lang==="lo"?"ສໍາເລັດ":"complete"} ({done}/{total})</span>
+        </div>
+      </div>
+    </div>
+
+    {/* Grouped job lists */}
+    {groups.map(g=>g.jobs.length>0&&<div key={g.id} style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",marginBottom:12,overflow:"hidden"}}>
+      <div style={{padding:"10px 16px",background:g.bg,borderBottom:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontWeight:700,color:g.color,fontSize:13}}>{g.label}</div>
+        <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,background:g.color+"18",color:g.color,fontWeight:700}}>{g.jobs.length}</span>
+      </div>
+      {g.jobs.map(j=><JobRow key={j.id} j={j} groupColor={g.color}/>)}
+    </div>)}
+
+    {mine.length===0&&<div style={{background:"#fff",borderRadius:12,padding:40,textAlign:"center",color:"#94a3b8",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+      ✅ {lang==="lo"?"ບໍ່ມີວຽກທີ່ໄດ້ຮັບມອບໝາຍ":"No jobs assigned to you yet"}
+    </div>}
+  </div>;
+}
+
+// ── ACTIVITY LOG PAGE ──────────────────────────────────────────
+function ActivityLogPage({jobs,users,getUser,lang}){
+  const [fUser,setFUser]=useState("all");
+  const [fAction,setFAction]=useState("all");
+  const [q,setQ]=useState("");
+  // Load logs from Google Sheets via reload — they're in the jobs+users context
+  // Since logs are not in main state, we fetch them separately
+  const [logs,setLogs]=useState([]);
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{
+    apiGet({action:"getAll"}).then(d=>{setLogs((d.logs||[]).filter(l=>l.id).sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0)));setLoading(false);}).catch(()=>setLoading(false));
+  },[]);
+
+  const filtered=logs.filter(l=>{
+    if(fUser!=="all"&&l.user_id!==fUser)return false;
+    if(fAction!=="all"&&!l.action?.includes(fAction))return false;
+    if(q&&!(l.action+"|"+(l.comment||"")).toLowerCase().includes(q.toLowerCase()))return false;
+    return true;
+  });
+
+  const getJobTitle=id=>{const j=jobs.find(j=>j.id===id);return j?(lang==="lo"&&j.title_lao?j.title_lao:j.title):(id||"—");};
+  const actionTypes=["all","job_created","job_updated","Status","Progress","Notes"];
+  const actionColor=a=>a?.includes("created")?"#16a34a":a?.includes("Status→done")?"#16a34a":a?.includes("Status")?"#2563eb":a?.includes("Progress")?"#7c3aed":a?.includes("Notes")?"#f59e0b":"#64748b";
+
+  return <div style={{animation:"fadeUp 0.3s ease"}}>
+    {/* Filter bar */}
+    <div style={{background:"#fff",borderRadius:12,padding:"12px 16px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+      <div style={{fontWeight:700,color:"#0f172a",fontSize:14}}>📋 {lang==="lo"?"ປະຫວັດກິດຈະກໍາ":"Activity Log"}</div>
+      <div style={{position:"relative"}}>
+        <span style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",color:"#94a3b8",fontSize:12}}>🔍</span>
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder={lang==="lo"?"ຄົ້ນຫາ...":"Search..."}
+          style={{...SS,paddingLeft:26,minWidth:160,borderRadius:20,background:"#f8fafc",border:"1px solid #e8edf5",fontSize:12}}/>
+      </div>
+      <select value={fUser} onChange={e=>setFUser(e.target.value)} style={{...SS,minWidth:130,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+        <option value="all">{lang==="lo"?"ທຸກຄົນ":"All Users"}</option>
+        {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+      </select>
+      <select value={fAction} onChange={e=>setFAction(e.target.value)} style={{...SS,minWidth:130,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+        {actionTypes.map(a=><option key={a} value={a}>{a==="all"?"All Actions":a}</option>)}
+      </select>
+      <span style={{marginLeft:"auto",fontSize:12,color:"#94a3b8"}}>{filtered.length} {lang==="lo"?"ລາຍການ":"entries"}</span>
+    </div>
+
+    <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+      {loading&&<div style={{padding:32,textAlign:"center",color:"#94a3b8"}}>⏳ Loading...</div>}
+      {!loading&&filtered.length===0&&<div style={{padding:32,textAlign:"center",color:"#94a3b8"}}>No activity found.</div>}
+      {!loading&&filtered.map((l,i)=>{
+        const u=getUser(l.user_id);
+        const ac=actionColor(l.action);
+        return <div key={l.id||i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"11px 16px",borderBottom:"1px solid #f1f5f9",transition:"background 0.1s"}}
+          onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"}
+          onMouseLeave={e=>e.currentTarget.style.background=""}>
+          <Avtr user={u} size={30}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"baseline",gap:6,flexWrap:"wrap"}}>
+              <span style={{fontWeight:700,color:"#1e293b",fontSize:12}}>{u?.name||l.user_id||"?"}</span>
+              <span style={{fontSize:11,padding:"1px 7px",borderRadius:99,background:ac+"18",color:ac,fontWeight:600}}>{l.action?.replace("job_","").replace("_"," ")}</span>
+            </div>
+            <div style={{fontSize:11,color:"#374151",marginTop:2}}><span style={{color:"#64748b"}}>Job: </span>{getJobTitle(l.job_id)}</div>
+            {l.comment&&<div style={{fontSize:11,color:"#64748b",marginTop:2,fontStyle:"italic"}}>{l.comment}</div>}
+          </div>
+          <div style={{fontSize:10,color:"#94a3b8",whiteSpace:"nowrap",flexShrink:0}}>{l.timestamp?.slice(0,16)||""}</div>
+        </div>;
+      })}
+    </div>
+  </div>;
+}
+
+// ── MONTH-END CLOSE PAGE ────────────────────────────────────────
+function MonthEndPage({jobs,projects,users,user,getUser,lang,onInlineUpdate,saving,onEdit}){
+  const now=new Date();
+  const y=now.getFullYear(),m=now.getMonth()+1;
+  const [expandedId,setExpandedId]=useState(null);
+  const [signedOff,setSignedOff]=useState(()=>{try{return JSON.parse(localStorage.getItem(`me_signoff_${y}_${m}`)||"false");}catch{return false;}});
+
+  // Month-end relevant categories
+  const ME_CATS=["Month-End Close","Bank Reconciliation","Accounts Payable","Accounts Receivable","Financial Report","Month-End Close","Year-End Close","Payroll","Tax Filing","Management Reporting"];
+
+  // Get all jobs relevant to this month
+  const monthStart=`${y}-${String(m).padStart(2,"0")}-01`;
+  const monthEnd=`${y}-${String(m).padStart(2,"0")}-31`;
+  const meJobs=jobs.filter(j=>{
+    const due=String(j.due_date).slice(0,10);
+    const isMonthly=j.id&&j.id.startsWith("mj_")&&j.id.includes(`_${y}_${m}`);
+    const isDuThisMonth=due>=monthStart&&due<=monthEnd;
+    const isMeCat=ME_CATS.includes(j.category);
+    return (isMonthly||isDuThisMonth)&&(user.role==="leader"||j.assignee_id===user.id);
+  });
+
+  const total=meJobs.length;
+  const done=meJobs.filter(j=>j.status==="done").length;
+  const pct=total?Math.round(done/total*100):0;
+  const allDone=pct===100;
+  const overdue=meJobs.filter(j=>String(j.due_date).slice(0,10)<now.toISOString().slice(0,10)&&j.status!=="done");
+  const blocked=meJobs.filter(j=>j.status==="blocked");
+
+  const signOff=()=>{
+    if(!allDone&&!window.confirm("Not all jobs are done. Sign off anyway?"))return;
+    const ts=new Date().toLocaleString();
+    setSignedOff({by:user.name,at:ts});
+    localStorage.setItem(`me_signoff_${y}_${m}`,JSON.stringify({by:user.name,at:ts}));
+  };
+
+  const printMonthEnd=()=>{
+    const win=window.open("","_blank");
+    if(!win)return;
+    const rows=meJobs.sort((a,b)=>(a.status==="done"?1:0)-(b.status==="done"?1:0)||(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>{
+      const od=String(j.due_date).slice(0,10)<now.toISOString().slice(0,10)&&j.status!=="done";
+      const notes=renderNotesHTML(j.notes);
+      return `<tr style="${j.status==="done"?"opacity:0.7":""}">
+        <td><strong>${lang==="lo"&&j.title_lao?j.title_lao:j.title}</strong>${notes?`<div style="margin-top:4px">${notes}</div>`:""}
+        </td>
+        <td>${getUser(j.assignee_id)?.name||"—"}</td>
+        <td><span class="b ${j.status}">${STATUS[j.status]?.en||j.status}</span></td>
+        <td style="color:${od?"#dc2626":"inherit"}">${od?"⚠ ":""}${cleanDate(j.due_date)}</td>
+        <td>${j.progress||0}%</td>
+      </tr>`;}).join("");
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Month-End Close</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;700&family=Noto+Sans:wght@400;700;800&display=swap" rel="stylesheet"/>
+    <style>*{box-sizing:border-box}body{font-family:'Noto Sans','Noto Sans Lao',Arial,sans-serif;padding:24px 28px;font-size:12px;color:#1e293b}
+    h1{font-size:18px;font-weight:800;margin-bottom:4px}
+    .meta{color:#64748b;font-size:10px;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #e2e8f0}
+    .kpi{display:flex;gap:12px;margin-bottom:18px}
+    .k{background:#f8fafc;border-radius:8px;padding:10px 16px;flex:1;border-top:3px solid #2563eb}
+    .k .n{font-size:22px;font-weight:800;color:#0f172a}.k .l{font-size:9px;color:#94a3b8;text-transform:uppercase;font-weight:600}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th{background:#0f172a;color:#fff;padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase}
+    td{padding:6px 10px;border-bottom:1px solid #e8edf5;vertical-align:top}
+    tr:nth-child(even) td{background:#f9fafb}
+    .b{padding:2px 7px;border-radius:99px;font-size:10px;font-weight:700;display:inline-block}
+    .done{background:#f0fdf4;color:#16a34a}.in-progress{background:#eff6ff;color:#2563eb}
+    .todo{background:#f1f5f9;color:#64748b}.blocked{background:#fef2f2;color:#dc2626}
+    .signoff{margin-top:24px;padding:12px 16px;border:2px solid ${allDone?"#16a34a":"#f59e0b"};border-radius:8px;background:${allDone?"#f0fdf4":"#fffbeb"}}
+    @media print{body{padding:10px 14px}@page{margin:12mm}}</style></head><body>
+    <h1>📅 Month-End Close Checklist — ${String(m).padStart(2,"0")}/${y}</h1>
+    <div class="meta">Generated: ${now.toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})} · Manager: ${user.name}</div>
+    <div class="kpi">
+      <div class="k" style="border-color:#2563eb"><div class="n">${total}</div><div class="l">Total Tasks</div></div>
+      <div class="k" style="border-color:#16a34a"><div class="n">${done}</div><div class="l">Completed</div></div>
+      <div class="k" style="border-color:#f59e0b"><div class="n">${pct}%</div><div class="l">Progress</div></div>
+      <div class="k" style="border-color:#dc2626"><div class="n">${overdue.length}</div><div class="l">Overdue</div></div>
+    </div>
+    <table><thead><tr><th>Task / Notes</th><th>Assignee</th><th>Status</th><th>Due</th><th>%</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="signoff">
+      ${signedOff?`<strong style="color:${allDone?"#16a34a":"#92400e"}">✓ Signed off by ${signedOff.by} at ${signedOff.at}</strong>`:`<strong style="color:#92400e">⚠ Not yet signed off</strong>`}
+    </div>
+    </body></html>`);
+    win.document.close();setTimeout(()=>win.print(),900);
+  };
+
+  return <div style={{animation:"fadeUp 0.3s ease"}}>
+    {/* Header + sign-off */}
+    <div style={{background:allDone?"linear-gradient(135deg,#14532d,#16a34a)":"linear-gradient(135deg,#1e3a5f,#2563eb)",borderRadius:14,padding:"18px 22px",marginBottom:16,boxShadow:"0 2px 8px rgba(0,0,0,0.12)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{color:allDone?"#bbf7d0":"#93c5fd",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>
+            📅 {lang==="lo"?"ສະຫຼຸບສິ້ນເດືອນ":"Month-End Close"} — {String(m).padStart(2,"0")}/{y}
+          </div>
+          <div style={{color:"#fff",fontSize:22,fontWeight:800}}>{done}/{total} {lang==="lo"?"ສໍາເລັດ":"tasks done"} · {pct}%</div>
+          {overdue.length>0&&<div style={{color:"#fca5a5",fontSize:12,marginTop:4}}>⚠ {overdue.length} {lang==="lo"?"ວຽກເກີນກໍານົດ":"overdue"}</div>}
+          {signedOff&&<div style={{color:"#86efac",fontSize:11,marginTop:4}}>✓ Signed off by {signedOff.by} · {signedOff.at}</div>}
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={printMonthEnd} style={{...BS("rgba(255,255,255,0.15)"),border:"1px solid rgba(255,255,255,0.3)",fontSize:12}}>↓ PDF</button>
+          {user.role==="leader"&&!signedOff&&<button onClick={signOff}
+            style={{...BS(allDone?"#16a34a":"#f59e0b"),fontSize:12,fontWeight:700}}>
+            {allDone?"✓ Sign Off Month":"Sign Off Anyway"}
+          </button>}
+          {signedOff&&user.role==="leader"&&<button onClick={()=>{setSignedOff(false);localStorage.removeItem(`me_signoff_${y}_${m}`);}}
+            style={{...BS("rgba(255,255,255,0.1)"),border:"1px solid rgba(255,255,255,0.2)",fontSize:12}}>↩ Undo Sign-off</button>}
+        </div>
+      </div>
+      {/* Master progress bar */}
+      <div style={{marginTop:14,height:10,background:"rgba(255,255,255,0.15)",borderRadius:99,overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${pct}%`,background:allDone?"#4ade80":"#60a5fa",borderRadius:99,transition:"width 0.8s"}}/>
+      </div>
+    </div>
+
+    {/* Alert strip */}
+    {(overdue.length>0||blocked.length>0)&&<div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:"10px 16px",marginBottom:12,display:"flex",gap:16,flexWrap:"wrap"}}>
+      {overdue.length>0&&<span style={{fontSize:12,color:"#dc2626",fontWeight:600}}>⚠ {overdue.length} overdue: {overdue.map(j=>lang==="lo"&&j.title_lao?j.title_lao:j.title).join(", ")}</span>}
+      {blocked.length>0&&<span style={{fontSize:12,color:"#f59e0b",fontWeight:600}}>🚫 {blocked.length} blocked</span>}
+    </div>}
+
+    {/* Job checklist */}
+    <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid #f1f5f9",fontSize:13,fontWeight:700,color:"#0f172a"}}>
+        {lang==="lo"?"ລາຍການວຽກ":"Task List"} ({total})
+      </div>
+      {meJobs.sort((a,b)=>(a.status==="done"?1:0)-(b.status==="done"?1:0)||(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>{
+        const od=String(j.due_date).slice(0,10)<now.toISOString().slice(0,10)&&j.status!=="done";
+        const pg=Number(j.progress)||0;
+        const isDone=j.status==="done";
+        const isEx=expandedId===j.id;
+        return <div key={j.id} style={{borderBottom:"1px solid #f1f5f9"}}>
+          <div onClick={()=>setExpandedId(isEx?null:j.id)}
+            style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",cursor:"pointer",background:isDone?"#f9fafb":isEx?"#eff6ff":"",opacity:isDone?0.7:1,transition:"background 0.1s"}}
+            onMouseEnter={e=>{if(!isEx&&!isDone)e.currentTarget.style.background="#f8fafc";}}
+            onMouseLeave={e=>{if(!isEx)e.currentTarget.style.background=isDone?"#f9fafb":"";}}>
+            {/* Status checkbox visual */}
+            <div style={{width:20,height:20,borderRadius:5,border:`2px solid ${isDone?"#16a34a":od?"#dc2626":"#d1d5db"}`,background:isDone?"#16a34a":"#fff",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {isDone&&<span style={{color:"#fff",fontSize:11,fontWeight:700}}>✓</span>}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:600,color:isDone?"#94a3b8":"#1e293b",fontSize:13,textDecoration:isDone?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+              <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{getUser(j.assignee_id)?.name||"?"} · {j.category}</div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:3}}>
+                <div style={{width:50,height:4,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${pg}%`,background:isDone?"#16a34a":od?"#dc2626":"#3b82f6",borderRadius:99}}/></div>
+                <span style={{fontSize:10,color:"#64748b",fontWeight:600}}>{pg}%</span>
+              </div>
+              <Badge status={j.status} lang={lang}/>
+              <span style={{fontSize:11,color:od?"#dc2626":"#94a3b8",fontWeight:od?700:400,whiteSpace:"nowrap"}}>{od?"⚠ ":""}{cleanDate(j.due_date)}</span>
+              <button onClick={e=>{e.stopPropagation();printJobCard(j,projects,getUser,lang);}} title="Print Card" style={{width:24,height:24,borderRadius:5,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"}}>🖨</button>
+            </div>
+          </div>
+          {isEx&&<JobDetailPanel job={j} user={user} getUser={getUser} projects={projects} lang={lang} saving={saving}
+            onSave={updated=>{onInlineUpdate(updated);setExpandedId(null);}}
+            onClose={()=>setExpandedId(null)}/>}
+        </div>;
+      })}
+      {meJobs.length===0&&<div style={{padding:40,textAlign:"center",color:"#94a3b8",fontSize:13}}>
+        {lang==="lo"?"ບໍ່ມີວຽກສຳລັບເດືອນນີ້":"No jobs found for this month. Check your job due dates or generate monthly jobs."}
+      </div>}
+    </div>
+  </div>;
+}
+
 // ── MAIN APP ───────────────────────────────────────────────────
 function App(){
   const [lang,setLang]=useState("en");
@@ -2530,14 +2999,17 @@ function App(){
 
   const navItems=[
     {id:"dashboard",icon:"⬡",en:"Dashboard",lo:"ໜ້າຫຼັກ"},
+    {id:"mywork",icon:"👤",en:"My Work",lo:"ວຽກຂ້ອຍ"},
     {id:"jobs",icon:"✦",en:"All Jobs",lo:"ວຽກທັງໝົດ"},
     {id:"projects",icon:"◈",en:"Projects",lo:"ໂຄງການ"},
     {id:"team",icon:"◉",en:"Team",lo:"ທີມງານ"},
     {id:"monthly",icon:"📅",en:"Monthly Jobs",lo:"ວຽກປະຈໍາເດືອນ"},
+    {id:"monthend",icon:"🗓",en:"Month-End",lo:"ສະຫຼຸບເດືອນ"},
     {id:"pending",icon:"📥",en:"Approvals",lo:"ອະນຸມັດ",badge:pendingCount},
     {id:"timeline",icon:"📊",en:"Timeline",lo:"ເສັ້ນທາງ"},
     {id:"board",icon:"📌",en:"Team Board",lo:"ກະດານ",badge:boardNewCount},
     {id:"reports",icon:"📈",en:"Reports",lo:"ລາຍງານ"},
+    {id:"activitylog",icon:"📋",en:"Activity Log",lo:"ປະຫວັດ"},
   ];
 
   return <div style={{display:"flex",height:"100vh",fontFamily:"'DM Sans','Noto Sans Lao',sans-serif",background:"#f0f2f8",overflow:"hidden"}}>
@@ -2587,14 +3059,17 @@ function App(){
       </div>
       <div style={{flex:1,overflow:"auto",padding:20}}>
         {page==="dashboard"&&<Dashboard stats={stats} jobs={jobs} projects={projects} user={user} getUser={getUser} onViewJobs={()=>setPage("jobs")} onViewMonthly={()=>setPage("monthly")} onJobClick={j=>setModal({type:"editJob",data:j})} onViewFiltered={(f)=>{if(f.startsWith("proj_")){setFilterProj(f.slice(5));setPage("jobs");}else if(f==="overdue"){setFilterProj(null);setPage("jobs");setDashFilter("overdue");}else if(f==="done"){setFilterProj(null);setPage("jobs");setDashFilter("done");}else if(f==="in-progress"){setFilterProj(null);setPage("jobs");setDashFilter("in-progress");}else{setFilterProj(null);setPage("jobs");}}} lang={lang}/>}
+        {page==="mywork"&&<MyWorkPage jobs={jobs} projects={projects} user={user} getUser={getUser} onEdit={j=>setModal({type:"editJob",data:j})} onInlineUpdate={j=>saveJob(j,false)} lang={lang} saving={saving}/>}
         {page==="jobs"&&<JobsPage allJobs={jobs} filterProj={filterProj} setFilterProj={setFilterProj} dashFilter={dashFilter} clearDashFilter={()=>setDashFilter(null)} projects={projects} users={users} user={user} getUser={getUser} onEdit={j=>setModal({type:"editJob",data:j})} onDelete={deleteJob} onInlineUpdate={j=>saveJob(j,false)} lang={lang} loading={loading} saving={saving}/>}
         {page==="projects"&&<ProjectsPage projects={projects} jobs={jobs} user={user} getUser={getUser} onSelectProj={id=>{setFilterProj(id);setPage("jobs");}} onEdit={p=>setModal({type:"editProject",data:p})} onDelete={deleteProject} lang={lang}/>}
         {page==="team"&&<TeamPage users={users} jobs={jobs} user={user} onAddUser={()=>setModal({type:"addUser"})} onEditUser={u=>setModal({type:"editUser",data:u})} onDeleteUser={deleteUser} lang={lang}/>}
         {page==="monthly"&&<MonthlyPage monthly={monthly} jobs={jobs} user={user} users={users} projects={projects} getUser={getUser} onSaveTemplate={saveTemplate} onDeleteTemplate={deleteTemplate} onGenerate={generateMonthly} lang={lang} generating={generating}/>}
+        {page==="monthend"&&<MonthEndPage jobs={jobs} projects={projects} users={users} user={user} getUser={getUser} lang={lang} onInlineUpdate={j=>saveJob(j,false)} saving={saving} onEdit={j=>setModal({type:"editJob",data:j})}/>}
         {page==="pending"&&<PendingPage pending={pending} user={user} getUser={getUser} onApprove={approveJob} onReject={rejectJob} lang={lang}/>}
         {page==="timeline"&&<TimelinePage projects={projects} jobs={jobs} getUser={getUser} users={users} lang={lang}/>}
         {page==="board"&&<BoardPage board={board} user={user} users={users} getUser={getUser} onAddNote={addNote} onEditNote={editNote} onDeleteNote={deleteNote} lang={lang}/>}
         {page==="reports"&&<ReportsPage jobs={jobs} projects={projects} users={users} user={user} getUser={getUser} lang={lang}/>}
+        {page==="activitylog"&&<ActivityLogPage jobs={jobs} users={users} getUser={getUser} lang={lang}/>}
       </div>
     </main>
 
@@ -2603,6 +3078,9 @@ function App(){
     {modal?.type==="requestJob"&&<JobRequestModal onClose={()=>setModal(null)} onSave={submitRequest} projects={projects} users={users} user={user} lang={lang} saving={saving}/>}
     {(modal?.type==="addProject"||modal?.type==="editProject")&&<ProjectModal initial={modal.data} onClose={()=>setModal(null)} onSave={data=>saveProject(data,!modal.data)} users={users} saving={saving} lang={lang}/>}
     {(modal?.type==="addUser"||modal?.type==="editUser")&&<UserModal initial={modal.data} onClose={()=>setModal(null)} onSave={data=>saveUser(data,!modal.data)} saving={saving} lang={lang}/>}
+
+    {/* DUE TODAY BANNER */}
+    {user&&<DueTodayBanner jobs={jobs} user={user} lang={lang} onOpenJob={j=>{setModal({type:"editJob",data:j});}}/>}
 
     {notif&&<div style={{position:"fixed",bottom:20,right:20,padding:"11px 18px",borderRadius:10,background:notif.type==="success"?"#16a34a":notif.type==="info"?"#2563eb":"#dc2626",color:"#fff",fontWeight:600,fontSize:13,boxShadow:"0 4px 20px rgba(0,0,0,0.2)",zIndex:9999,animation:"fadeUp 0.3s ease"}}>{notif.msg}</div>}
   </div>;
