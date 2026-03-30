@@ -923,8 +923,22 @@ function MonthlyPage({monthly,jobs,user,users,projects,getUser,onSaveTemplate,on
         {myTpls.length===0&&<div style={{color:"#94a3b8",fontSize:13,textAlign:"center",padding:"20px 0"}}>{lang==="lo"?"ຍັງບໍ່ມີ. ກົດ + ເພີ່ມ":"None yet. Click + Add Template"}</div>}
         {myTpls.map(tp=><div key={tp.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #f1f5f9"}}>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:600,color:"#1e293b",fontSize:13,display:"flex",alignItems:"center",gap:7}}>{lang==="lo"&&tp.title_lao?tp.title_lao:tp.title}<span style={{fontSize:10,padding:"1px 6px",borderRadius:99,background:isAct(tp)?"#f0fdf4":"#f1f5f9",color:isAct(tp)?"#16a34a":"#94a3b8",fontWeight:700,flexShrink:0}}>{isAct(tp)?"Active":"Off"}</span></div>
-            <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{tp.category} · {tp.estimated_hours}h · <PriDot priority={tp.priority} lang={lang}/></div>
+            <div style={{fontWeight:600,color:"#1e293b",fontSize:13,display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+              {lang==="lo"&&tp.title_lao?tp.title_lao:tp.title}
+              <span style={{fontSize:10,padding:"1px 6px",borderRadius:99,background:isAct(tp)?"#f0fdf4":"#f1f5f9",color:isAct(tp)?"#16a34a":"#94a3b8",fontWeight:700,flexShrink:0}}>{isAct(tp)?"Active":"Off"}</span>
+              {tp.schedule&&tp.schedule!=="monthly"&&<span style={{fontSize:10,padding:"1px 7px",borderRadius:99,background:"#eff6ff",color:"#2563eb",fontWeight:700,flexShrink:0}}>
+                {tp.schedule==="biweekly"?"2x/mo":tp.schedule==="weekly"?"weekly":tp.schedule==="every_n_days"?`every ${tp.schedule_day}d`:""}
+              </span>}
+            </div>
+            <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>
+              {tp.category} · {tp.estimated_hours}h · <PriDot priority={tp.priority} lang={lang}/>
+              {tp.schedule&&tp.schedule!=="monthly"&&<span style={{marginLeft:4,color:"#2563eb"}}>
+                · {tp.schedule==="biweekly"?`Every 2 wks · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][Number(tp.schedule_day)||4]}`
+                  :tp.schedule==="weekly"?`Weekly · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][Number(tp.schedule_day)||0]}`
+                  :tp.schedule==="every_n_days"?`Every ${tp.schedule_day||14} days`:""}
+                {tp.due_offset?` · T+${tp.due_offset}`:""}
+              </span>}
+            </div>
           </div>
           <div style={{display:"flex",gap:5,flexShrink:0,marginLeft:8}}>
             <button onClick={()=>setModal({type:"edit",data:tp})} style={{...BS("#2563eb"),padding:"4px 9px",fontSize:11}}>{t.edit}</button>
@@ -956,9 +970,76 @@ function MonthlyPage({monthly,jobs,user,users,projects,getUser,onSaveTemplate,on
 
 function TemplateModal({initial,onClose,onSave,user,users,projects,lang}){
   const t=T[lang];
-  const [f,setF]=useState(initial||{id:"",title:"",title_lao:"",description:"",project_id:projects[0]?.id||"",default_assignee_id:user.id,owner_id:user.id,priority:"high",category:"Month-End Close",estimated_hours:8,active:true});
+  const DAYS_EN=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const DAYS_LO=["ອາທິດ","ຈັນ","ອັງຄານ","ພຸດ","ພະຫັດ","ສຸກ","ເສົາ"];
+
+  const [f,setF]=useState(initial||{
+    id:"",title:"",title_lao:"",description:"",
+    project_id:projects[0]?.id||"",
+    default_assignee_id:user.id,owner_id:user.id,
+    priority:"high",category:"Month-End Close",estimated_hours:8,active:true,
+    schedule:"monthly",    // monthly | weekly | biweekly | every_n_days
+    schedule_day:4,        // 0-6 for weekday; N for every_n_days interval
+    due_offset:1,          // days after start date = due date
+    anchor_date:"",        // first known occurrence — ensures correct cross-month intervals
+  });
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
-  return <Modal title={initial?(lang==="lo"?"ແກ້ໄຂແມ່ແບບ":"Edit Template"):(lang==="lo"?"ແມ່ແບບໃໝ່":"New Template")} onClose={onClose} onSave={()=>onSave(f)}>
+
+  // Derived: preview of generated dates — mirrors Code.gs logic exactly
+  const previewDates=useMemo(()=>{
+    const now=new Date(),y=now.getFullYear(),m=now.getMonth();
+    const monthStart=new Date(y,m,1);
+    const monthEnd=new Date(y,m+1,0);
+    const fmt=d=>d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+    const addD=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x;};
+    const off=Number(f.due_offset)||1;
+
+    // Get all occurrences within the month given anchor + interval (mirrors Code.gs getOccurrencesInMonth)
+    const getOccs=(anchorStr,interval)=>{
+      let anchor=anchorStr?new Date(anchorStr+"T00:00:00"):null;
+      if(!anchor){
+        // fallback: find first matching weekday from 2024-01-01
+        const ref=new Date(2024,0,1);
+        while(ref.getDay()!==(f.schedule==="every_n_days"?0:Number(f.schedule_day)||4))ref.setDate(ref.getDate()+1);
+        anchor=ref;
+      }
+      // Walk anchor to first occurrence >= monthStart
+      let cur=new Date(anchor);
+      if(cur>monthStart){
+        const diff=Math.ceil((cur-monthStart)/(interval*86400000));
+        cur.setDate(cur.getDate()-diff*interval);
+      }
+      while(cur<monthStart)cur.setDate(cur.getDate()+interval);
+      if(cur>monthEnd)return[];
+      const results=[];
+      while(cur<=monthEnd){results.push(new Date(cur));cur.setDate(cur.getDate()+interval);}
+      return results;
+    };
+
+    if(f.schedule==="monthly"){
+      const s=new Date(y,m,1);return [{start:fmt(s),due:fmt(addD(s,off))}];
+    }
+    if(f.schedule==="weekly"){
+      return getOccs(f.anchor_date,7).map(d=>({start:fmt(d),due:fmt(addD(d,off))}));
+    }
+    if(f.schedule==="biweekly"){
+      return getOccs(f.anchor_date,14).map(d=>({start:fmt(d),due:fmt(addD(d,off))}));
+    }
+    if(f.schedule==="every_n_days"){
+      const n=Number(f.schedule_day)||14;
+      return getOccs(f.anchor_date,n).map(d=>({start:fmt(d),due:fmt(addD(d,off))}));
+    }
+    return [];
+  },[f.schedule,f.schedule_day,f.due_offset,f.anchor_date]);
+
+  const scheduleLabel={
+    monthly:lang==="lo"?"ເດືອນລະຄັ້ງ (ວັນທີ 1)":"Once a month (1st)",
+    weekly:lang==="lo"?"ທຸກອາທິດ":"Every week",
+    biweekly:lang==="lo"?"ທຸກ 2 ອາທິດ (1ສ & 3ສ ຂອງເດືອນ)":"Every 2 weeks (1st & 3rd occurrence)",
+    every_n_days:lang==="lo"?"ທຸກ N ວັນ":"Every N days",
+  };
+
+  return <Modal title={initial?(lang==="lo"?"ແກ້ໄຂແມ່ແບບ":"Edit Template"):(lang==="lo"?"ແມ່ແບບໃໝ່":"New Template")} onClose={onClose} onSave={()=>onSave(f)} wide>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
       <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (EN)"}><input value={f.title} onChange={e=>set("title",e.target.value)} style={IS}/></Lbl></div>
       <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (ລາວ)"}><input value={f.title_lao||""} onChange={e=>set("title_lao",e.target.value)} style={IS}/></Lbl></div>
@@ -968,7 +1049,62 @@ function TemplateModal({initial,onClose,onSave,user,users,projects,lang}){
       <Lbl label={t.project}><select value={f.project_id||""} onChange={e=>set("project_id",e.target.value)} style={IS}><option value="">-- None --</option>{projects.map(p=><option key={p.id} value={p.id}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</option>)}</select></Lbl>
       <Lbl label={t.estHrs}><input type="number" min="1" value={f.estimated_hours||8} onChange={e=>set("estimated_hours",+e.target.value)} style={IS}/></Lbl>
       {user.role==="leader"&&<div style={{gridColumn:"1/-1"}}><Lbl label={t.assignee+" (default)"}><select value={f.default_assignee_id||user.id} onChange={e=>set("default_assignee_id",e.target.value)} style={IS}>{users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Lbl></div>}
-      <div style={{gridColumn:"1/-1"}}><Lbl label={lang==="lo"?"ສະຖານະ":"Active (generate each month?)"}><div style={{display:"flex",gap:10}}>{[true,false].map(v=><button key={String(v)} type="button" onClick={()=>set("active",v)} style={{flex:1,padding:"9px",borderRadius:8,border:`2px solid ${f.active===v?"#2563eb":"#e2e8f0"}`,background:f.active===v?"#eff6ff":"#fff",color:f.active===v?"#2563eb":"#94a3b8",fontWeight:700,fontSize:13}}>{v?(lang==="lo"?"✓ ໃຊ້ງານ":"✓ Active"):(lang==="lo"?"✗ ປິດ":"✗ Off")}</button>)}</div></Lbl></div>
+
+      {/* ── SCHEDULE SECTION ── */}
+      <div style={{gridColumn:"1/-1",borderTop:"1px solid #f1f5f9",paddingTop:14,marginTop:4}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:0.5,marginBottom:12}}>⏰ {lang==="lo"?"ຕາຕະລາງ / ຄວາມຖີ່":"Schedule / Frequency"}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          {/* Schedule type */}
+          <Lbl label={lang==="lo"?"ຄວາມຖີ່":"Frequency"}>
+            <select value={f.schedule} onChange={e=>{set("schedule",e.target.value);if(e.target.value==="biweekly")set("schedule_day",4);if(e.target.value==="every_n_days")set("schedule_day",14);if(e.target.value==="monthly")set("due_offset",10);if(e.target.value!=="monthly")set("due_offset",1);}} style={IS}>
+              {Object.entries(scheduleLabel).map(([k,l])=><option key={k} value={k}>{l}</option>)}
+            </select>
+          </Lbl>
+
+          {/* Conditional day picker */}
+          {(f.schedule==="weekly"||f.schedule==="biweekly")&&<Lbl label={lang==="lo"?"ວັນໃນອາທິດ":"Day of Week"}>
+            <select value={Number(f.schedule_day)} onChange={e=>set("schedule_day",+e.target.value)} style={IS}>
+              {DAYS_EN.map((d,i)=><option key={i} value={i}>{lang==="lo"?DAYS_LO[i]:d}</option>)}
+            </select>
+          </Lbl>}
+          {f.schedule==="every_n_days"&&<Lbl label={lang==="lo"?"ທຸກກີ່ວັນ":"Every N Days"}>
+            <input type="number" min="1" max="30" value={Number(f.schedule_day)||14} onChange={e=>set("schedule_day",+e.target.value)} style={IS}/>
+          </Lbl>}
+          {f.schedule==="monthly"&&<Lbl label={lang==="lo"?"ຄົບກໍານົດ (ວັນທີ 1 + N)":"Due Offset (T+N days)"}>
+            <input type="number" min="0" max="30" value={Number(f.due_offset)||10} onChange={e=>set("due_offset",+e.target.value)} style={IS}/>
+          </Lbl>}
+
+          {/* Due offset for non-monthly */}
+          {f.schedule!=="monthly"&&<Lbl label={lang==="lo"?"ຄົບກໍານົດ ຫຼັງ N ວັນ (T+N)":"Due Date Offset (T+N days)"}>
+            <input type="number" min="0" max="14" value={Number(f.due_offset)||1} onChange={e=>set("due_offset",+e.target.value)} style={IS} placeholder="1 = next day"/>
+          </Lbl>}
+        </div>
+
+        {/* Preview box */}
+        <div style={{marginTop:12,padding:"10px 14px",background:"#f0f9ff",borderRadius:8,border:"1px solid #bfdbfe"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#1d4ed8",marginBottom:6}}>
+            📅 {lang==="lo"?"ຕົວຢ່າງ ສຳລັບເດືອນ":"Preview for"} {new Date().toLocaleDateString("en-US",{month:"long",year:"numeric"})}
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {previewDates.map((d,i)=>(
+              <div key={i} style={{background:"#fff",borderRadius:6,padding:"5px 10px",border:"1px solid #bfdbfe",fontSize:12}}>
+                <span style={{fontWeight:600,color:"#1d4ed8"}}>#{i+1}</span>
+                <span style={{color:"#374151",marginLeft:4}}>Start {d.start}</span>
+                <span style={{color:"#64748b",marginLeft:4}}>→ Due {d.due}</span>
+              </div>
+            ))}
+            {previewDates.length===0&&<span style={{color:"#94a3b8",fontSize:12}}>No occurrences this month</span>}
+          </div>
+          {f.schedule==="biweekly"&&<div style={{fontSize:11,color:"#1d4ed8",marginTop:6}}>
+            💡 {lang==="lo"
+              ?`ວຽກຈະຖືກສ້າງ ${previewDates.length} ຄັ້ງ ໃນເດືອນ — ວັນ${lang==="lo"?DAYS_LO[Number(f.schedule_day)]:"Thu"}ທີ 1 ແລະ 3 ຂອງເດືອນ`
+              :`Generates ${previewDates.length} jobs/month — the 1st and 3rd ${DAYS_EN[Number(f.schedule_day)||4]} of each month`}
+          </div>}
+        </div>
+      </div>
+
+      {/* Active toggle */}
+      <div style={{gridColumn:"1/-1"}}><Lbl label={lang==="lo"?"ສະຖານະ":"Active (auto-generate?)"}><div style={{display:"flex",gap:10}}>{[true,false].map(v=><button key={String(v)} type="button" onClick={()=>set("active",v)} style={{flex:1,padding:"9px",borderRadius:8,border:`2px solid ${f.active===v?"#2563eb":"#e2e8f0"}`,background:f.active===v?"#eff6ff":"#fff",color:f.active===v?"#2563eb":"#94a3b8",fontWeight:700,fontSize:13}}>{v?(lang==="lo"?"✓ ໃຊ້ງານ":"✓ Active"):(lang==="lo"?"✗ ປິດ":"✗ Off")}</button>)}</div></Lbl></div>
     </div>
   </Modal>;
 }
