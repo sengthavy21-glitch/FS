@@ -933,7 +933,7 @@ function MonthlyPage({monthly,jobs,user,users,projects,getUser,onSaveTemplate,on
             <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>
               {tp.category} · {tp.estimated_hours}h · <PriDot priority={tp.priority} lang={lang}/>
               {tp.schedule&&tp.schedule!=="monthly"&&<span style={{marginLeft:4,color:"#2563eb"}}>
-                · {tp.schedule==="biweekly"?`Every 2 wks · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][Number(tp.schedule_day)||4]}`
+                · {tp.schedule==="biweekly"?`Every 14d · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][Number(tp.schedule_day)||4]}`
                   :tp.schedule==="weekly"?`Weekly · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][Number(tp.schedule_day)||0]}`
                   :tp.schedule==="every_n_days"?`Every ${tp.schedule_day||14} days`:""}
                 {tp.due_offset?` · T+${tp.due_offset}`:""}
@@ -998,9 +998,11 @@ function TemplateModal({initial,onClose,onSave,user,users,projects,lang}){
     const getOccs=(anchorStr,interval)=>{
       let anchor=anchorStr?new Date(anchorStr+"T00:00:00"):null;
       if(!anchor){
-        // fallback: find first matching weekday from 2024-01-01
-        const ref=new Date(2024,0,1);
-        while(ref.getDay()!==(f.schedule==="every_n_days"?0:Number(f.schedule_day)||4))ref.setDate(ref.getDate()+1);
+        // No anchor set: use the first matching weekday in the CURRENT month as a preview fallback.
+        // This is just for the preview — real generation REQUIRES anchor_date in template.
+        const weekday=(f.schedule==="every_n_days")?1:Number(f.schedule_day)||4;
+        const ref=new Date(y,m,1);
+        while(ref.getDay()!==weekday)ref.setDate(ref.getDate()+1);
         anchor=ref;
       }
       // Walk anchor to first occurrence >= monthStart
@@ -1012,7 +1014,7 @@ function TemplateModal({initial,onClose,onSave,user,users,projects,lang}){
       while(cur<monthStart)cur.setDate(cur.getDate()+interval);
       if(cur>monthEnd)return[];
       const results=[];
-      while(cur<=monthEnd){results.push(new Date(cur));cur.setDate(cur.getDate()+interval);}
+      while(cur<=monthEnd){results.push(new Date(cur));cur=new Date(cur);cur.setDate(cur.getDate()+interval);}
       return results;
     };
 
@@ -1033,10 +1035,10 @@ function TemplateModal({initial,onClose,onSave,user,users,projects,lang}){
   },[f.schedule,f.schedule_day,f.due_offset,f.anchor_date]);
 
   const scheduleLabel={
-    monthly:lang==="lo"?"ເດືອນລະຄັ້ງ (ວັນທີ 1)":"Once a month (1st)",
-    weekly:lang==="lo"?"ທຸກອາທິດ":"Every week",
-    biweekly:lang==="lo"?"ທຸກ 2 ອາທິດ (1ສ & 3ສ ຂອງເດືອນ)":"Every 2 weeks (1st & 3rd occurrence)",
-    every_n_days:lang==="lo"?"ທຸກ N ວັນ":"Every N days",
+    monthly:lang==="lo"?"ເດືອນລະຄັ້ງ (ວັນທີ 1)":"Once a month (1st of month)",
+    weekly:lang==="lo"?"ທຸກ 7 ວັນ (ທຸກອາທິດ)":"Every 7 days (weekly)",
+    biweekly:lang==="lo"?"ທຸກ 14 ວັນ (ສອງອາທິດຄັ້ງ)":"Every 14 days (bi-weekly, true interval)",
+    every_n_days:lang==="lo"?"ທຸກ N ວັນ (ກຳນົດເອງ)":"Every N days (custom interval)",
   };
 
   return <Modal title={initial?(lang==="lo"?"ແກ້ໄຂແມ່ແບບ":"Edit Template"):(lang==="lo"?"ແມ່ແບບໃໝ່":"New Template")} onClose={onClose} onSave={()=>onSave(f)} wide>
@@ -1054,51 +1056,88 @@ function TemplateModal({initial,onClose,onSave,user,users,projects,lang}){
       <div style={{gridColumn:"1/-1",borderTop:"1px solid #f1f5f9",paddingTop:14,marginTop:4}}>
         <div style={{fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:0.5,marginBottom:12}}>⏰ {lang==="lo"?"ຕາຕະລາງ / ຄວາມຖີ່":"Schedule / Frequency"}</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+
           {/* Schedule type */}
           <Lbl label={lang==="lo"?"ຄວາມຖີ່":"Frequency"}>
-            <select value={f.schedule} onChange={e=>{set("schedule",e.target.value);if(e.target.value==="biweekly")set("schedule_day",4);if(e.target.value==="every_n_days")set("schedule_day",14);if(e.target.value==="monthly")set("due_offset",10);if(e.target.value!=="monthly")set("due_offset",1);}} style={IS}>
+            <select value={f.schedule} onChange={e=>{
+              const v=e.target.value;
+              set("schedule",v);
+              if(v==="biweekly")set("schedule_day",4);
+              if(v==="every_n_days")set("schedule_day",14);
+              if(v==="monthly"){set("due_offset",10);set("anchor_date","");}
+              if(v!=="monthly")set("due_offset",1);
+            }} style={IS}>
               {Object.entries(scheduleLabel).map(([k,l])=><option key={k} value={k}>{l}</option>)}
             </select>
           </Lbl>
 
-          {/* Conditional day picker */}
+          {/* Day of week (weekly / biweekly) */}
           {(f.schedule==="weekly"||f.schedule==="biweekly")&&<Lbl label={lang==="lo"?"ວັນໃນອາທິດ":"Day of Week"}>
             <select value={Number(f.schedule_day)} onChange={e=>set("schedule_day",+e.target.value)} style={IS}>
               {DAYS_EN.map((d,i)=><option key={i} value={i}>{lang==="lo"?DAYS_LO[i]:d}</option>)}
             </select>
           </Lbl>}
+
+          {/* Every N days interval */}
           {f.schedule==="every_n_days"&&<Lbl label={lang==="lo"?"ທຸກກີ່ວັນ":"Every N Days"}>
             <input type="number" min="1" max="30" value={Number(f.schedule_day)||14} onChange={e=>set("schedule_day",+e.target.value)} style={IS}/>
           </Lbl>}
-          {f.schedule==="monthly"&&<Lbl label={lang==="lo"?"ຄົບກໍານົດ (ວັນທີ 1 + N)":"Due Offset (T+N days)"}>
+
+          {/* Due offset */}
+          {f.schedule==="monthly"&&<Lbl label={lang==="lo"?"ຄົບກໍານົດ (ວັນທີ 1 + N)":"Due Offset from 1st (days)"}>
             <input type="number" min="0" max="30" value={Number(f.due_offset)||10} onChange={e=>set("due_offset",+e.target.value)} style={IS}/>
           </Lbl>}
-
-          {/* Due offset for non-monthly */}
-          {f.schedule!=="monthly"&&<Lbl label={lang==="lo"?"ຄົບກໍານົດ ຫຼັງ N ວັນ (T+N)":"Due Date Offset (T+N days)"}>
-            <input type="number" min="0" max="14" value={Number(f.due_offset)||1} onChange={e=>set("due_offset",+e.target.value)} style={IS} placeholder="1 = next day"/>
+          {f.schedule!=="monthly"&&<Lbl label={lang==="lo"?"ຄົບກໍານົດ ຫຼັງ N ວັນ (T+N)":"Due Date: T + N days"}>
+            <input type="number" min="0" max="14" value={Number(f.due_offset)||1} onChange={e=>set("due_offset",+e.target.value)} style={IS}/>
           </Lbl>}
+
+          {/* ── ANCHOR DATE — critical for weekly/biweekly/every_n_days ── */}
+          {f.schedule!=="monthly"&&<div style={{gridColumn:"1/-1"}}>
+            <Lbl label={lang==="lo"?"ວັນທີ່ທຳອິດ (Anchor Date) *ສຳຄັນ":"First Occurrence Date (Anchor) *Required"}>
+              <input type="date" value={f.anchor_date||""} onChange={e=>set("anchor_date",e.target.value)} style={IS}/>
+            </Lbl>
+            <div style={{fontSize:11,color:"#64748b",marginTop:-8,marginBottom:4,padding:"6px 10px",background:"#fefce8",borderRadius:6,border:"1px solid #fde68a",lineHeight:1.6}}>
+              ⚠️ <strong>{lang==="lo"?"ຕ້ອງລະບຸ:":"Must set:"}</strong> {lang==="lo"
+                ?"ເລືອກວັນທີ່ທີ່ວຽກນີ້ຈະເຮັດຄັ້ງທໍາອິດ ຈາກນັ້ນລະບົບຈະຄຳນວນ interval ໂດຍອໍາໂນມັດ (ຖ້າຕ້ອງການທຸກ 14 ວັນ ໃສ່ວັນພະຫັດຄັ້ງທໍາອິດ)"
+                :"Pick the exact date this job first runs. The system counts forward by the interval from there — ensuring correct weeks every month. Example: first Thursday = Apr 3, 2025 → every 14 days from that date."}
+            </div>
+          </div>}
         </div>
 
         {/* Preview box */}
-        <div style={{marginTop:12,padding:"10px 14px",background:"#f0f9ff",borderRadius:8,border:"1px solid #bfdbfe"}}>
-          <div style={{fontSize:11,fontWeight:700,color:"#1d4ed8",marginBottom:6}}>
+        <div style={{marginTop:12,padding:"12px 14px",background:"#f0f9ff",borderRadius:8,border:"1px solid #bfdbfe"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#1d4ed8",marginBottom:8}}>
             📅 {lang==="lo"?"ຕົວຢ່າງ ສຳລັບເດືອນ":"Preview for"} {new Date().toLocaleDateString("en-US",{month:"long",year:"numeric"})}
+            {f.schedule!=="monthly"&&!f.anchor_date&&<span style={{color:"#f59e0b",fontWeight:400,marginLeft:8}}>← {lang==="lo"?"ໃສ່ Anchor Date ກ່ອນ":"Set anchor date above for accurate preview"}</span>}
           </div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {previewDates.map((d,i)=>(
-              <div key={i} style={{background:"#fff",borderRadius:6,padding:"5px 10px",border:"1px solid #bfdbfe",fontSize:12}}>
-                <span style={{fontWeight:600,color:"#1d4ed8"}}>#{i+1}</span>
-                <span style={{color:"#374151",marginLeft:4}}>Start {d.start}</span>
-                <span style={{color:"#64748b",marginLeft:4}}>→ Due {d.due}</span>
-              </div>
-            ))}
-            {previewDates.length===0&&<span style={{color:"#94a3b8",fontSize:12}}>No occurrences this month</span>}
-          </div>
-          {f.schedule==="biweekly"&&<div style={{fontSize:11,color:"#1d4ed8",marginTop:6}}>
-            💡 {lang==="lo"
-              ?`ວຽກຈະຖືກສ້າງ ${previewDates.length} ຄັ້ງ ໃນເດືອນ — ວັນ${lang==="lo"?DAYS_LO[Number(f.schedule_day)]:"Thu"}ທີ 1 ແລະ 3 ຂອງເດືອນ`
-              :`Generates ${previewDates.length} jobs/month — the 1st and 3rd ${DAYS_EN[Number(f.schedule_day)||4]} of each month`}
+          {previewDates.length>0
+            ?<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {previewDates.map((d,i)=>(
+                <div key={i} style={{background:"#fff",borderRadius:6,padding:"6px 12px",border:"1px solid #bfdbfe",fontSize:12,lineHeight:1.5}}>
+                  <div style={{fontWeight:700,color:"#1d4ed8",fontSize:10,marginBottom:1}}>Occurrence #{i+1}</div>
+                  <div style={{color:"#374151"}}>▶ {d.start}</div>
+                  <div style={{color:"#64748b"}}>✓ Due {d.due}</div>
+                </div>
+              ))}
+            </div>
+            :<div style={{color:"#94a3b8",fontSize:12}}>
+              {f.schedule==="monthly"?"1 job on the 1st of the month":f.anchor_date?"No occurrences fall in this month with that anchor":"Set an anchor date to see the preview"}
+            </div>
+          }
+          {/* Explanation of how the interval works */}
+          {f.schedule!=="monthly"&&previewDates.length>0&&<div style={{marginTop:10,fontSize:11,color:"#1d4ed8",padding:"6px 10px",background:"rgba(255,255,255,0.7)",borderRadius:6}}>
+            💡 {f.schedule==="biweekly"
+              ?(lang==="lo"
+                ?`ທຸກ 14 ວັນ ຈາກ ${f.anchor_date||"anchor"} — ໄດ້ ${previewDates.length} ຄັ້ງ ໃນເດືອນນີ້`
+                :`Every 14 days from anchor — ${previewDates.length} occurrence${previewDates.length!==1?"s":""} this month. Weeks stay correct across month boundaries.`)
+              :f.schedule==="weekly"
+              ?(lang==="lo"
+                ?`ທຸກ 7 ວັນ — ໄດ້ ${previewDates.length} ຄັ້ງ ໃນເດືອນນີ້`
+                :`Every 7 days — ${previewDates.length} occurrence${previewDates.length!==1?"s":""} this month.`)
+              :(lang==="lo"
+                ?`ທຸກ ${Number(f.schedule_day)||14} ວັນ — ໄດ້ ${previewDates.length} ຄັ້ງ ໃນເດືອນນີ້`
+                :`Every ${Number(f.schedule_day)||14} days — ${previewDates.length} occurrence${previewDates.length!==1?"s":""} this month.`)
+            }
           </div>}
         </div>
       </div>
