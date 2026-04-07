@@ -836,7 +836,7 @@ function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,p
             {/* JOB ROWS */}
             {!isCollapsed&&<>
               {/* Column headers */}
-              <div style={{display:"grid",gridTemplateColumns:"28px 1fr 120px 100px 100px 76px 72px 88px"+(showHrs?" 78px":"")+" 90px",background:dark?"#111827":"#f5f7fc",borderBottom:`1px solid ${dark?"#1e2d40":"#dde5f0"}`,padding:"0 0"}}>
+              <div style={{display:"grid",gridTemplateColumns:"28px 1fr 120px 100px 100px 76px 72px 88px"+(showHrs?" 78px":"")+" 120px",background:dark?"#111827":"#f5f7fc",borderBottom:`1px solid ${dark?"#1e2d40":"#dde5f0"}`,padding:"0 0"}}>
                 {["","Job","Category","Assignee","Status","Priority","Due","Progress",...(showHrs?["Hours"]:[]),"Actions"].map((h,i)=>(
                   <div key={i} style={{padding:"6px 10px",fontSize:9,fontWeight:700,color:dark?"#4a5a7a":"#8899aa",textTransform:"uppercase",letterSpacing:0.5,overflow:"hidden",whiteSpace:"nowrap"}}>{h}</div>
                 ))}
@@ -849,7 +849,7 @@ function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,p
                   <div key={j.id} style={{borderBottom:`1px solid ${dark?"#1a2235":"#edf1f7"}`}}>
                     {/* ROW */}
                     <div onClick={()=>toggleRow(j.id)}
-                      style={{display:"grid",gridTemplateColumns:"28px 1fr 120px 100px 100px 76px 72px 88px"+(showHrs?" 78px":"")+" 90px",alignItems:"center",
+                      style={{display:"grid",gridTemplateColumns:"28px 1fr 120px 100px 100px 76px 72px 88px"+(showHrs?" 78px":"")+" 120px",alignItems:"center",
                         background:isExpanded?(dark?"#1e2d4a":"#eff6ff"):(dark?"#161b22":"#ffffff"),
                         opacity:j.status==="done"?0.6:1,cursor:"pointer",transition:"background 0.1s"}}
                       onMouseEnter={e=>{if(!isExpanded)e.currentTarget.style.background=dark?"#1a2235":"#f4f7fc";}}
@@ -3236,7 +3236,7 @@ function App(){
 
   // ── APP LAUNCHER (edit URLs here) ──────────────────────────────
   const APP_LINKS=[
-    {label:"DMS",        sublabel:"Doc Management System", icon:"📁", color:"#0369a1", url:"//10.0.3.214/fss/fs/FS project/doc_managerment_system-v3/frontend/index_v5.html"},
+    {label:"DMS",        sublabel:"Doc Management System", icon:"📁", color:"#0369a1", url:"\\10.0.3.214\fss\fs\FS project\doc_managerment_system-v3\frontend\index_v5.html"},
     {label:"FIRS Project",sublabel:"FIRS DATA API",  icon:"⚡", color:"#7c3aed", url:"https://sengthavy21-glitch.github.io/FIRS/"},
   ];
 
