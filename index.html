@@ -10,11 +10,33 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Noto+Sans+Lao:wght@400;600;700&display=swap" rel="stylesheet"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'DM Sans','Noto Sans Lao',sans-serif;}
+:root{
+  --bg:#eef1f8;--surface:#ffffff;--surface2:#f8fafc;--surface3:#f1f5f9;
+  --border:#e2e8f0;--border2:#dde3ed;
+  --text:#0f172a;--text2:#374151;--text3:#64748b;--text4:#94a3b8;
+  --shadow:0 1px 4px rgba(0,0,0,0.07);
+}
+[data-theme="dark"]{
+  --bg:#0d1117;--surface:#161b22;--surface2:#1c2230;--surface3:#21283a;
+  --border:#2d3748;--border2:#374151;
+  --text:#e2e8f0;--text2:#cbd5e1;--text3:#8899aa;--text4:#55657a;
+  --shadow:0 1px 6px rgba(0,0,0,0.5);
+}
+body{font-family:'DM Sans','Noto Sans Lao',sans-serif;background:var(--bg);color:var(--text);}
+/* Inputs flip automatically via CSS - browsers respect CSS vars on form elements */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea{
+  background:#1c2230!important;
+  color:#e2e8f0!important;
+  border-color:#2d3748!important;
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder{color:#55657a!important;}
+input:focus,select:focus,textarea:focus{border-color:#3b82f6!important;box-shadow:0 0 0 3px rgba(59,130,246,0.15)!important;outline:none!important;}
 ::-webkit-scrollbar{width:5px;height:5px;}
-::-webkit-scrollbar-track{background:#f1f5f9;}
-::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:99px;}
-input:focus,select:focus,textarea:focus{border-color:#3b82f6!important;box-shadow:0 0 0 3px rgba(59,130,246,0.12)!important;outline:none!important;}
+::-webkit-scrollbar-track{background:var(--surface3);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes shake{0%,100%{transform:translateX(0)}25%,75%{transform:translateX(-7px)}50%{transform:translateX(7px)}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
@@ -26,6 +48,33 @@ button{cursor:pointer;font-family:'DM Sans','Noto Sans Lao',sans-serif;}
 <body><div id="root"></div>
 <script type="text/babel">
 const {useState,useEffect,useRef,useMemo}=React;
+
+// ── DARK MODE ─────────────────────────────────────────────────
+// Must be defined before IS/SS/tb style constants
+window.__fstDark=localStorage.getItem("fst_theme")==="dark";
+const D=(l,d)=>window.__fstDark?d:l;
+const DK={
+  bg:   ()=>D("#ffffff","#161b22"),
+  bg2:  ()=>D("#f8fafc","#1c2230"),
+  bg3:  ()=>D("#f1f5f9","#21283a"),
+  txt:  ()=>D("#0f172a","#e2e8f0"),
+  txt2: ()=>D("#1e293b","#cbd5e1"),
+  txt3: ()=>D("#374151","#94a3b8"),
+  txt4: ()=>D("#64748b","#8899aa"),
+  txt5: ()=>D("#94a3b8","#55657a"),
+  bdr:  ()=>D("#e2e8f0","#2d3748"),
+  bdr2: ()=>D("#e8edf5","#2d3748"),
+  bdr3: ()=>D("#f1f5f9","#21283a"),
+  shd:  ()=>D("0 1px 4px rgba(0,0,0,0.07)","0 1px 6px rgba(0,0,0,0.5)"),
+};
+
+// ── STYLES ─────────────────────────────────────────────────────
+// IS/SS must be functions so they re-evaluate DK on each render
+const IS=()=>({width:"100%",boxSizing:"border-box",padding:"9px 12px",borderRadius:8,border:`1px solid ${DK.bdr()}`,fontSize:13,color:DK.txt2(),fontFamily:"'DM Sans','Noto Sans Lao',sans-serif",outline:"none",background:DK.bg()});
+const SS=()=>({...IS(),padding:"8px 12px"});
+const BS=(bg,x={})=>({padding:"8px 16px",borderRadius:8,border:"none",background:bg,color:"#fff",fontSize:13,fontWeight:600,...x});
+const tb=()=>({borderBottom:`1px solid ${DK.bdr3()}`});
+
 
 const API="https://script.google.com/macros/s/AKfycbxcw3_VBpXXbpVYzLhG6E8qgRPPydlpeuGmiaL0N5RSwA13fByL1Jrg7-Ou1TGv-pyqAg/exec";
 
@@ -114,18 +163,16 @@ function sanitize(o){
   if(o&&typeof o==="object"){const n={};for(const k of Object.keys(o)){const v=o[k];if(typeof v==="string"&&v.match(/^\d{4}-\d{2}-\d{2}T/))n[k]=v.slice(0,10);else if(v instanceof Date)n[k]=v.toISOString().slice(0,10);else if(v&&typeof v==="object"&&!Array.isArray(v))n[k]=sanitize(v);else n[k]=v;}return n;}return o;
 }
 
-// Styles
-const IS={width:"100%",boxSizing:"border-box",padding:"9px 12px",borderRadius:8,border:"1px solid #e2e8f0",fontSize:13,color:"#1e293b",fontFamily:"'DM Sans','Noto Sans Lao',sans-serif",outline:"none",background:"#fff"};
-const SS={...IS,padding:"8px 12px"};
-const BS=(bg,x={})=>({padding:"8px 16px",borderRadius:8,border:"none",background:bg,color:"#fff",fontSize:13,fontWeight:600,...x});
-const tb={borderBottom:"1px solid #f1f5f9"};
+
+
+
 
 // Shared Components
-function Lbl({label,children}){return <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:700,color:"#374151",marginBottom:5,textTransform:"uppercase",letterSpacing:0.3}}>{label}</label>{children}</div>;}
+function Lbl({label,children}){return <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:700,color:DK.txt3(),marginBottom:5,textTransform:"uppercase",letterSpacing:0.3}}>{label}</label>{children}</div>;}
 function Badge({status,lang}){const c=STATUS[status]||{en:status,lo:status,c:"#64748b",bg:"#f1f5f9"};return <span style={{padding:"3px 9px",borderRadius:99,fontSize:11,fontWeight:700,color:c.c,background:c.bg,whiteSpace:"nowrap"}}>{c[lang]||c.en}</span>;}
 function PriDot({priority,lang}){const c=PRIORITY[priority]||{en:priority,lo:priority,c:"#94a3b8"};return <span style={{fontSize:12,fontWeight:700,color:c.c,whiteSpace:"nowrap"}}>● {c[lang]||c.en}</span>;}
 function Avtr({user,size=30,showName=false}){
-  if(!user)return <span style={{color:"#94a3b8"}}>—</span>;
+  if(!user)return <span style={{color:DK.txt5()}}>—</span>;
   return <div style={{display:"flex",alignItems:"center",gap:7}}>
     <div style={{width:size,height:size,borderRadius:"50%",flexShrink:0,background:user.role==="leader"?"linear-gradient(135deg,#3b82f6,#7c3aed)":"linear-gradient(135deg,#06b6d4,#10b981)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:Math.max(9,size*0.34),fontWeight:700,color:"#fff"}}>
       {user.avatar||(user.name||"?")[0]}
@@ -134,15 +181,15 @@ function Avtr({user,size=30,showName=false}){
   </div>;
 }
 function Modal({title,onClose,onSave,saveLabel="Save",saveColor="#2563eb",saving,children,wide=false}){
-  return <div style={{position:"fixed",inset:0,background:"rgba(15,23,41,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>e.target===e.currentTarget&&onClose()}>
-    <div style={{background:"#fff",borderRadius:16,padding:26,width:wide?660:540,maxHeight:"92vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)",animation:"fadeUp 0.2s ease"}}>
+  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <div style={{background:DK.bg(),borderRadius:16,padding:26,width:wide?660:540,maxHeight:"92vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.4)",animation:"fadeUp 0.2s ease",border:`1px solid ${DK.bdr()}`}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
-        <div style={{fontSize:17,fontWeight:700,color:"#0f172a"}}>{title}</div>
-        <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,color:"#94a3b8",padding:4}}>✕</button>
+        <div style={{fontSize:17,fontWeight:700,color:DK.txt()}}>{title}</div>
+        <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,color:DK.txt5(),padding:4}}>✕</button>
       </div>
       {children}
       {onSave&&<div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:18}}>
-        <button onClick={onClose} style={{padding:"9px 18px",borderRadius:8,border:"1px solid #e2e8f0",background:"#fff",fontWeight:600,color:"#475569"}}>{T.en.cancel}</button>
+        <button onClick={onClose} style={{padding:"9px 18px",borderRadius:8,border:`1px solid ${DK.bdr()}`,background:DK.bg2(),fontWeight:600,color:"#475569"}}>{T.en.cancel}</button>
         <button onClick={onSave} disabled={saving} style={{...BS(saveColor),padding:"9px 22px",opacity:saving?0.7:1}}>{saving?"Saving...":saveLabel}</button>
       </div>}
     </div>
@@ -153,47 +200,47 @@ function Modal({title,onClose,onSave,saveLabel="Save",saveColor="#2563eb",saving
 function JobForm({form,set,projects,users,user,lang,isRequest=false}){
   const t=T[lang];
   return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-    <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (EN)"}><input value={form.title||""} onChange={e=>set("title",e.target.value)} style={IS} placeholder="e.g. Bank Reconciliation"/></Lbl></div>
-    <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (ລາວ)"}><input value={form.title_lao||""} onChange={e=>set("title_lao",e.target.value)} style={IS} placeholder="ຊື່ວຽກ ພາສາລາວ"/></Lbl></div>
-    <div style={{gridColumn:"1/-1"}}><Lbl label={t.desc}><textarea value={form.description||""} onChange={e=>set("description",e.target.value)} style={{...IS,height:55,resize:"vertical"}}/></Lbl></div>
+    <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (EN)"}><input value={form.title||""} onChange={e=>set("title",e.target.value)} style={IS()} placeholder="e.g. Bank Reconciliation"/></Lbl></div>
+    <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (ລາວ)"}><input value={form.title_lao||""} onChange={e=>set("title_lao",e.target.value)} style={IS()} placeholder="ຊື່ວຽກ ພາສາລາວ"/></Lbl></div>
+    <div style={{gridColumn:"1/-1"}}><Lbl label={t.desc}><textarea value={form.description||""} onChange={e=>set("description",e.target.value)} style={{...IS(),height:55,resize:"vertical"}}/></Lbl></div>
     <Lbl label={t.project}>
-      <select value={form.project_id||""} onChange={e=>set("project_id",e.target.value)} style={IS}>
+      <select value={form.project_id||""} onChange={e=>set("project_id",e.target.value)} style={IS()}>
         <option value="">-- Select Project --</option>
         {projects.map(p=><option key={p.id} value={p.id}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</option>)}
       </select>
     </Lbl>
     <Lbl label={t.assignee}>
-      <select value={form.assignee_id||""} onChange={e=>set("assignee_id",e.target.value)} style={IS} disabled={isRequest}>
+      <select value={form.assignee_id||""} onChange={e=>set("assignee_id",e.target.value)} style={IS()} disabled={isRequest}>
         <option value="">-- Select --</option>
         {(isRequest?[user]:users).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
       </select>
     </Lbl>
     <Lbl label={t.category}>
-      <select value={form.category||""} onChange={e=>set("category",e.target.value)} style={IS}>
+      <select value={form.category||""} onChange={e=>set("category",e.target.value)} style={IS()}>
         <option value="">-- Select Category --</option>
         {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
       </select>
     </Lbl>
     <Lbl label={t.priority}>
-      <select value={form.priority||"medium"} onChange={e=>set("priority",e.target.value)} style={IS}>
+      <select value={form.priority||"medium"} onChange={e=>set("priority",e.target.value)} style={IS()}>
         {Object.entries(PRIORITY).map(([k,v])=><option key={k} value={k}>{v[lang]||v.en}</option>)}
       </select>
     </Lbl>
     {!isRequest&&<Lbl label={t.status}>
-      <select value={form.status||"todo"} onChange={e=>set("status",e.target.value)} style={IS}>
+      <select value={form.status||"todo"} onChange={e=>set("status",e.target.value)} style={IS()}>
         {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v[lang]||v.en}</option>)}
       </select>
     </Lbl>}
-    <Lbl label={t.startDate}><input type="date" value={form.start_date||""} onChange={e=>set("start_date",e.target.value)} style={IS}/></Lbl>
-    <Lbl label={t.dueDate}><input type="date" value={form.due_date||""} onChange={e=>set("due_date",e.target.value)} style={IS}/></Lbl>
-    <Lbl label={t.estHrs}><input type="number" min="1" value={form.estimated_hours||8} onChange={e=>set("estimated_hours",+e.target.value)} style={IS}/></Lbl>
-    {!isRequest&&<Lbl label={t.actHrs}><input type="number" min="0" value={form.actual_hours||0} onChange={e=>set("actual_hours",+e.target.value)} style={IS}/></Lbl>}
+    <Lbl label={t.startDate}><input type="date" value={form.start_date||""} onChange={e=>set("start_date",e.target.value)} style={IS()}/></Lbl>
+    <Lbl label={t.dueDate}><input type="date" value={form.due_date||""} onChange={e=>set("due_date",e.target.value)} style={IS()}/></Lbl>
+    <Lbl label={t.estHrs}><input type="number" min="1" value={form.estimated_hours||8} onChange={e=>set("estimated_hours",+e.target.value)} style={IS()}/></Lbl>
+    {!isRequest&&<Lbl label={t.actHrs}><input type="number" min="0" value={form.actual_hours||0} onChange={e=>set("actual_hours",+e.target.value)} style={IS()}/></Lbl>}
     {!isRequest&&<div style={{gridColumn:"1/-1"}}>
       <Lbl label={t.progress+": "+String(form.progress||0)+"%"}>
         <input type="range" min="0" max="100" value={form.progress||0} onChange={e=>set("progress",+e.target.value)} style={{width:"100%",marginTop:4}}/>
       </Lbl>
     </div>}
-    <div style={{gridColumn:"1/-1"}}><Lbl label={t.notes}><textarea value={form.notes||""} onChange={e=>set("notes",e.target.value)} style={{...IS,height:50,resize:"vertical"}}/></Lbl></div>
+    <div style={{gridColumn:"1/-1"}}><Lbl label={t.notes}><textarea value={form.notes||""} onChange={e=>set("notes",e.target.value)} style={{...IS(),height:50,resize:"vertical"}}/></Lbl></div>
   </div>;
 }
 
@@ -221,11 +268,11 @@ function Login({onLogin,lang,setLang}){
       <div style={{textAlign:"center",marginBottom:24}}>
         <div style={{fontSize:11,letterSpacing:4,color:"#3b82f6",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>FS Taskflow v9</div>
         <div style={{fontSize:28,fontWeight:800,color:"#fff"}}>{lang==="lo"?"ການເງິນ & ບັນຊີ":"Finance & Accounting"}</div>
-        <div style={{color:"#64748b",fontSize:13,marginTop:5}}>{lang==="lo"?"ເຂົ້າສູ່ລະບົບ":"Sign in to your workspace"}</div>
+        <div style={{color:DK.txt4(),fontSize:13,marginTop:5}}>{lang==="lo"?"ເຂົ້າສູ່ລະບົບ":"Sign in to your workspace"}</div>
       </div>
       <div style={{background:"rgba(255,255,255,0.04)",backdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:16,padding:30,boxShadow:"0 25px 60px rgba(0,0,0,0.5)",animation:shake?"shake 0.5s":"fadeUp 0.4s ease"}}>
-        <Lbl label={t.email}><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com" style={{...IS,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",color:"#e2e8f0"}}/></Lbl>
-        <Lbl label={t.password}><input value={pwd} onChange={e=>setPwd(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doLogin()} type="password" placeholder="••••••••" style={{...IS,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",color:"#e2e8f0"}}/></Lbl>
+        <Lbl label={t.email}><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com" style={{...IS(),background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",color:"#e2e8f0"}}/></Lbl>
+        <Lbl label={t.password}><input value={pwd} onChange={e=>setPwd(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doLogin()} type="password" placeholder="••••••••" style={{...IS(),background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",color:"#e2e8f0"}}/></Lbl>
         {err&&<div style={{color:"#f87171",fontSize:13,marginBottom:12,textAlign:"center"}}>{err}</div>}
         <button onClick={doLogin} disabled={loading} style={{...BS("linear-gradient(135deg,#2563eb,#7c3aed)"),width:"100%",padding:"12px",fontSize:15,opacity:loading?0.7:1}}>
           {loading?<><span className="spin">◌</span> {t.loading}</>:t.signIn}
@@ -233,8 +280,8 @@ function Login({onLogin,lang,setLang}){
         <div style={{marginTop:18,borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:14}}>
           <div style={{color:"#475569",fontSize:11,marginBottom:8,textAlign:"center",textTransform:"uppercase",letterSpacing:1}}>{lang==="lo"?"ບັນຊີທົດສອບ":"Demo Accounts"}</div>
           {[{lbl:t.leader,email:"admin@company.com",pwd:"admin123"},{lbl:t.runner,email:"fin@company.com",pwd:"staff123"}].map(a=>(
-            <button key={a.lbl} onClick={()=>{setEmail(a.email);setPwd(a.pwd);}} style={{display:"block",width:"100%",marginBottom:5,padding:"7px 12px",borderRadius:6,border:"1px solid rgba(255,255,255,0.06)",background:"rgba(255,255,255,0.02)",color:"#64748b",fontSize:12,textAlign:"left"}}>
-              <strong style={{color:"#94a3b8"}}>{a.lbl}:</strong> {a.email} / {a.pwd}
+            <button key={a.lbl} onClick={()=>{setEmail(a.email);setPwd(a.pwd);}} style={{display:"block",width:"100%",marginBottom:5,padding:"7px 12px",borderRadius:6,border:"1px solid rgba(255,255,255,0.06)",background:"rgba(255,255,255,0.02)",color:DK.txt4(),fontSize:12,textAlign:"left"}}>
+              <strong style={{color:DK.txt5()}}>{a.lbl}:</strong> {a.email} / {a.pwd}
             </button>
           ))}
         </div>
@@ -275,13 +322,13 @@ function Dashboard({stats,jobs,projects,user,getUser,onViewJobs,onViewMonthly,on
     <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:14,marginBottom:18}}>
       {statCards.map(s=>(
         <div key={s.lbl} onClick={s.action}
-          style={{background:"#fff",borderRadius:12,padding:"16px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`3px solid ${s.c}`,cursor:"pointer",transition:"box-shadow 0.15s,transform 0.12s"}}
+          style={{background:DK.bg(),borderRadius:12,padding:"16px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`3px solid ${s.c}`,cursor:"pointer",transition:"box-shadow 0.15s,transform 0.12s"}}
           onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 6px 20px ${s.c}28`;e.currentTarget.style.transform="translateY(-2px)";}}
           onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)";e.currentTarget.style.transform="";}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
             <div>
-              <div style={{color:"#94a3b8",fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:0.4,whiteSpace:"nowrap"}}>{s.lbl}</div>
-              <div style={{fontSize:28,fontWeight:800,color:"#0f172a",marginTop:2}}>{s.val}</div>
+              <div style={{color:DK.txt5(),fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:0.4,whiteSpace:"nowrap"}}>{s.lbl}</div>
+              <div style={{fontSize:28,fontWeight:800,color:DK.txt(),marginTop:2}}>{s.val}</div>
             </div>
             <div style={{width:36,height:36,borderRadius:10,background:s.c+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:s.c}}>{s.i}</div>
           </div>
@@ -293,9 +340,9 @@ function Dashboard({stats,jobs,projects,user,getUser,onViewJobs,onViewMonthly,on
     {/* MONTHLY CARDS */}
     {myMonthly.length>0&&<div style={{marginBottom:16}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>
+        <div style={{fontSize:13,fontWeight:700,color:DK.txt()}}>
           📅 {lang==="lo"?"ວຽກປະຈໍາເດືອນ":"Monthly Routine"} — {String(m).padStart(2,"0")}/{y}
-          <span style={{marginLeft:8,fontSize:12,color:"#64748b",fontWeight:400}}>({myMonthly.filter(j=>j.status==="done").length}/{myMonthly.length} {lang==="lo"?"ສໍາເລັດ":"done"})</span>
+          <span style={{marginLeft:8,fontSize:12,color:DK.txt4(),fontWeight:400}}>({myMonthly.filter(j=>j.status==="done").length}/{myMonthly.length} {lang==="lo"?"ສໍາເລັດ":"done"})</span>
         </div>
         <button onClick={onViewMonthly} style={{fontSize:12,color:"#2563eb",background:"none",border:"none",fontWeight:600,cursor:"pointer"}}>{t.viewAll}</button>
       </div>
@@ -305,21 +352,21 @@ function Dashboard({stats,jobs,projects,user,getUser,onViewJobs,onViewMonthly,on
           const pg=Number(j.progress)||0;
           const borderC=j.status==="done"?"#16a34a":od?"#dc2626":PRIORITY[j.priority]?.c||"#3b82f6";
           return <div key={j.id} onClick={()=>onJobClick(j)}
-            style={{background:"#fff",borderRadius:12,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`3px solid ${borderC}`,cursor:"pointer",transition:"box-shadow 0.15s,transform 0.15s"}}
+            style={{background:DK.bg(),borderRadius:12,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`3px solid ${borderC}`,cursor:"pointer",transition:"box-shadow 0.15s,transform 0.15s"}}
             onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.12)";e.currentTarget.style.transform="translateY(-2px)";}}
             onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)";e.currentTarget.style.transform="";}}>
-            <div style={{fontWeight:700,color:"#0f172a",fontSize:13,marginBottom:6,lineHeight:1.3}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+            <div style={{fontWeight:700,color:DK.txt(),fontSize:13,marginBottom:6,lineHeight:1.3}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
             <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:8}}>
               <Badge status={j.status} lang={lang}/>
               {od&&<span style={{fontSize:10,color:"#dc2626",fontWeight:700}}>⚠</span>}
             </div>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-              <div style={{flex:1,height:5,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+              <div style={{flex:1,height:5,background:DK.bg3(),borderRadius:99,overflow:"hidden"}}>
                 <div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":borderC,borderRadius:99}}/>
               </div>
-              <span style={{fontSize:11,color:"#64748b",fontWeight:600,flexShrink:0}}>{pg}%</span>
+              <span style={{fontSize:11,color:DK.txt4(),fontWeight:600,flexShrink:0}}>{pg}%</span>
             </div>
-            <div style={{fontSize:11,color:"#94a3b8"}}>{t.due} {cleanDate(j.due_date)}</div>
+            <div style={{fontSize:11,color:DK.txt5()}}>{t.due} {cleanDate(j.due_date)}</div>
           </div>;
         })}
       </div>
@@ -327,19 +374,19 @@ function Dashboard({stats,jobs,projects,user,getUser,onViewJobs,onViewMonthly,on
 
     <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:16}}>
       {/* Recent Jobs */}
-      <div style={{background:"#fff",borderRadius:12,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+      <div style={{background:DK.bg(),borderRadius:12,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{t.recentJobs}</div>
+          <div style={{fontSize:15,fontWeight:700,color:DK.txt()}}>{t.recentJobs}</div>
           <button onClick={onViewJobs} style={{fontSize:12,color:"#2563eb",background:"none",border:"none",fontWeight:600,cursor:"pointer"}}>{t.viewAll}</button>
         </div>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-          <thead><tr>{[t.jobTitle,t.assignee,t.status,t.priority,t.dueDate].map(h=><th key={h} style={{textAlign:"left",padding:"7px 10px",color:"#94a3b8",fontWeight:600,fontSize:11,textTransform:"uppercase",borderBottom:"1px solid #f1f5f9"}}>{h}</th>)}</tr></thead>
+          <thead><tr>{[t.jobTitle,t.assignee,t.status,t.priority,t.dueDate].map(h=><th key={h} style={{textAlign:"left",padding:"7px 10px",color:DK.txt5(),fontWeight:600,fontSize:11,textTransform:"uppercase",borderBottom:`1px solid ${DK.bdr3()}`}}>{h}</th>)}</tr></thead>
           <tbody>
-            {recent.length===0&&<tr><td colSpan={5} style={{textAlign:"center",padding:20,color:"#94a3b8",fontSize:12}}>✅ {lang==="lo"?"ວຽກທັງໝົດສໍາເລັດ":"All caught up!"}</td></tr>}
+            {recent.length===0&&<tr><td colSpan={5} style={{textAlign:"center",padding:20,color:DK.txt5(),fontSize:12}}>✅ {lang==="lo"?"ວຽກທັງໝົດສໍາເລັດ":"All caught up!"}</td></tr>}
             {recent.map(j=>{
               const od=new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done";
-              return <tr key={j.id} style={tb} onClick={()=>onJobClick(j)} onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"} onMouseLeave={e=>e.currentTarget.style.background=""}>
-                <td style={{padding:"8px 10px",cursor:"pointer"}}><div style={{fontWeight:600,color:"#1e293b",fontSize:13}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div><div style={{fontSize:11,color:"#94a3b8"}}>{j.category}</div></td>
+              return <tr key={j.id} style={tb()} onClick={()=>onJobClick(j)} onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"} onMouseLeave={e=>e.currentTarget.style.background=""}>
+                <td style={{padding:"8px 10px",cursor:"pointer"}}><div style={{fontWeight:600,color:DK.txt2(),fontSize:13}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div><div style={{fontSize:11,color:DK.txt5()}}>{j.category}</div></td>
                 <td style={{padding:"8px 10px"}}><Avtr user={getUser(j.assignee_id)} size={24}/></td>
                 <td style={{padding:"8px 10px"}}><Badge status={j.status} lang={lang}/></td>
                 <td style={{padding:"8px 10px"}}><PriDot priority={j.priority} lang={lang}/></td>
@@ -350,8 +397,8 @@ function Dashboard({stats,jobs,projects,user,getUser,onViewJobs,onViewMonthly,on
         </table>
       </div>
       {/* Projects */}
-      <div style={{background:"#fff",borderRadius:12,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-        <div style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:12}}>{t.projectsOverview}</div>
+      <div style={{background:DK.bg(),borderRadius:12,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+        <div style={{fontSize:15,fontWeight:700,color:DK.txt(),marginBottom:12}}>{t.projectsOverview}</div>
         {projects.map(p=>{
           const pj=jobs.filter(j=>j.project_id===p.id),dn=pj.filter(j=>j.status==="done").length,pct=pj.length?Math.round((dn/pj.length)*100):0;
           return <div key={p.id} style={{marginBottom:14,cursor:"pointer",padding:"6px 8px",borderRadius:8,transition:"background 0.12s"}}
@@ -359,13 +406,13 @@ function Dashboard({stats,jobs,projects,user,getUser,onViewJobs,onViewMonthly,on
             onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"}
             onMouseLeave={e=>e.currentTarget.style.background=""}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-              <div style={{fontWeight:600,color:"#1e293b",fontSize:13}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div>
-              <div style={{color:"#64748b",fontSize:12}}>{pct}%</div>
+              <div style={{fontWeight:600,color:DK.txt2(),fontSize:13}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div>
+              <div style={{color:DK.txt4(),fontSize:12}}>{pct}%</div>
             </div>
-            <div style={{height:6,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+            <div style={{height:6,background:DK.bg3(),borderRadius:99,overflow:"hidden"}}>
               <div style={{height:"100%",width:`${pct}%`,background:pct===100?"#16a34a":"linear-gradient(90deg,#3b82f6,#7c3aed)",borderRadius:99,transition:"width 0.8s"}}/>
             </div>
-            <div style={{color:"#94a3b8",fontSize:11,marginTop:2}}>{dn}/{pj.length} {t.tasksDone} · {t.due} {cleanDate(p.due_date)}</div>
+            <div style={{color:DK.txt5(),fontSize:11,marginTop:2}}>{dn}/{pj.length} {t.tasksDone} · {t.due} {cleanDate(p.due_date)}</div>
           </div>;
         })}
       </div>
@@ -412,7 +459,7 @@ function RenderNotesJSX({raw,compact=false}){
   const TAG_C={blocker:"#dc2626",next:"#2563eb",info:"#0369a1",done:"#16a34a"};
   const doneCount=items.filter(i=>i.done).length;
   return <div>
-    {!compact&&items.length>1&&<div style={{fontSize:10,color:"#94a3b8",marginBottom:3}}>{doneCount}/{items.length} done</div>}
+    {!compact&&items.length>1&&<div style={{fontSize:10,color:DK.txt5(),marginBottom:3}}>{doneCount}/{items.length} done</div>}
     {items.map(it=>(
       <div key={it.id} style={{display:"flex",alignItems:"baseline",gap:5,marginBottom:2}}>
         <span style={{fontSize:11,color:it.done?"#16a34a":"#94a3b8",flexShrink:0}}>{it.done?"☑":"☐"}</span>
@@ -454,15 +501,15 @@ function NoteChecklist({raw,onChange,canEdit,lang}){
   return <div style={{display:"flex",flexDirection:"column",gap:0}}>
     {/* Progress summary */}
     {items.length>0&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-      <div style={{flex:1,height:5,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+      <div style={{flex:1,height:5,background:DK.bg3(),borderRadius:99,overflow:"hidden"}}>
         <div style={{height:"100%",width:`${items.length?Math.round(doneCount/items.length*100):0}%`,background:"#16a34a",borderRadius:99,transition:"width 0.3s"}}/>
       </div>
-      <span style={{fontSize:11,color:"#64748b",fontWeight:600,whiteSpace:"nowrap"}}>{doneCount}/{items.length} {lang==="lo"?"ສໍາເລັດ":"done"}</span>
+      <span style={{fontSize:11,color:DK.txt4(),fontWeight:600,whiteSpace:"nowrap"}}>{doneCount}/{items.length} {lang==="lo"?"ສໍາເລັດ":"done"}</span>
     </div>}
 
     {/* Items list */}
     <div style={{maxHeight:220,overflowY:"auto",marginBottom:8}}>
-      {items.length===0&&<div style={{color:"#94a3b8",fontSize:12,textAlign:"center",padding:"12px 0"}}>{lang==="lo"?"ຍັງບໍ່ມີລາຍການ":"No items yet — add one below"}</div>}
+      {items.length===0&&<div style={{color:DK.txt5(),fontSize:12,textAlign:"center",padding:"12px 0"}}>{lang==="lo"?"ຍັງບໍ່ມີລາຍການ":"No items yet — add one below"}</div>}
       {items.map((it,i)=>(
         <div key={it.id} style={{display:"flex",alignItems:"flex-start",gap:6,padding:"5px 4px",borderRadius:7,background:it.done?"#f0fdf4":"#fff",marginBottom:3,border:"1px solid",borderColor:it.done?"#bbf7d0":"#f1f5f9",transition:"background 0.15s"}}>
           {/* Checkbox */}
@@ -475,7 +522,7 @@ function NoteChecklist({raw,onChange,canEdit,lang}){
             {canEdit
               ? <input value={it.text} onChange={e=>editText(it.id,e.target.value)}
                   onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addItem();}if(e.key==="Backspace"&&it.text===""&&items.length>0){e.preventDefault();removeItem(it.id);}}}
-                  style={{...IS,padding:"2px 6px",fontSize:12,textDecoration:it.done?"line-through":"none",color:it.done?"#94a3b8":"#1e293b",background:"transparent",border:"1px solid transparent",borderRadius:4,width:"100%"}}
+                  style={{...IS(),padding:"2px 6px",fontSize:12,textDecoration:it.done?"line-through":"none",color:it.done?"#94a3b8":"#1e293b",background:"transparent",border:"1px solid transparent",borderRadius:4,width:"100%"}}
                   onFocus={e=>e.target.style.borderColor="#e2e8f0"}
                   onBlur={e=>e.target.style.borderColor="transparent"}/>
               : <span style={{fontSize:12,color:it.done?"#94a3b8":"#1e293b",textDecoration:it.done?"line-through":"none",lineHeight:"20px",display:"block",padding:"2px 6px"}}>{it.text}</span>
@@ -485,10 +532,10 @@ function NoteChecklist({raw,onChange,canEdit,lang}){
           {it.tag&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:99,background:(TAG_C[it.tag]||"#64748b")+"18",color:TAG_C[it.tag]||"#64748b",fontWeight:700,flexShrink:0,marginTop:4,whiteSpace:"nowrap"}}>{it.tag}</span>}
           {/* Actions */}
           {canEdit&&<div style={{display:"flex",gap:2,flexShrink:0,marginTop:2,opacity:0.5}}>
-            <button onClick={()=>moveUp(i)} title="Move up" style={{width:16,height:16,border:"none",background:"none",cursor:"pointer",fontSize:9,color:"#94a3b8",padding:0,lineHeight:1}}>▲</button>
-            <button onClick={()=>moveDown(i)} title="Move down" style={{width:16,height:16,border:"none",background:"none",cursor:"pointer",fontSize:9,color:"#94a3b8",padding:0,lineHeight:1}}>▼</button>
+            <button onClick={()=>moveUp(i)} title="Move up" style={{width:16,height:16,border:"none",background:"none",cursor:"pointer",fontSize:9,color:DK.txt5(),padding:0,lineHeight:1}}>▲</button>
+            <button onClick={()=>moveDown(i)} title="Move down" style={{width:16,height:16,border:"none",background:"none",cursor:"pointer",fontSize:9,color:DK.txt5(),padding:0,lineHeight:1}}>▼</button>
             {canEdit&&<select value={it.tag} onChange={e=>editTag(it.id,e.target.value)}
-              style={{fontSize:9,border:"1px solid #e2e8f0",borderRadius:3,padding:"1px 2px",color:"#94a3b8",background:"#fff",cursor:"pointer",height:16}}>
+              style={{fontSize:9,border:`1px solid ${DK.bdr()}`,borderRadius:3,padding:"1px 2px",color:DK.txt5(),background:DK.bg(),cursor:"pointer",height:16}}>
               {TAGS.map(t=><option key={t.v} value={t.v}>{t.l}</option>)}
             </select>}
             <button onClick={()=>removeItem(it.id)} title="Remove" style={{width:16,height:16,border:"none",background:"none",cursor:"pointer",fontSize:11,color:"#fca5a5",padding:0,lineHeight:1}}>✕</button>
@@ -498,14 +545,14 @@ function NoteChecklist({raw,onChange,canEdit,lang}){
     </div>
 
     {/* Add new item row */}
-    {canEdit&&<div style={{display:"flex",gap:5,alignItems:"center",padding:"6px 8px",background:"#f8fafc",borderRadius:8,border:"1px solid #e8edf5"}}>
-      <span style={{fontSize:14,color:"#94a3b8",flexShrink:0}}>+</span>
+    {canEdit&&<div style={{display:"flex",gap:5,alignItems:"center",padding:"6px 8px",background:DK.bg2(),borderRadius:8,border:`1px solid ${DK.bdr2()}`}}>
+      <span style={{fontSize:14,color:DK.txt5(),flexShrink:0}}>+</span>
       <input ref={inputRef} value={newText} onChange={e=>setNewText(e.target.value)}
         onKeyDown={e=>e.key==="Enter"&&addItem()}
         placeholder={lang==="lo"?"ເພີ່ມລາຍການ...":"Add item... (Enter to add)"}
-        style={{...IS,flex:1,padding:"5px 8px",fontSize:12,background:"transparent",border:"none",outline:"none"}}/>
+        style={{...IS(),flex:1,padding:"5px 8px",fontSize:12,background:"transparent",border:"none",outline:"none"}}/>
       <select value={newTag} onChange={e=>setNewTag(e.target.value)}
-        style={{fontSize:11,border:"1px solid #e2e8f0",borderRadius:6,padding:"4px 6px",color:"#64748b",background:"#fff",cursor:"pointer",flexShrink:0}}>
+        style={{fontSize:11,border:`1px solid ${DK.bdr()}`,borderRadius:6,padding:"4px 6px",color:DK.txt4(),background:DK.bg(),cursor:"pointer",flexShrink:0}}>
         {TAGS.map(t=><option key={t.v} value={t.v}>{t.l}</option>)}
       </select>
       <button onClick={addItem} disabled={!newText.trim()}
@@ -541,7 +588,7 @@ function JobDetailPanel({job,user,getUser,projects,lang,onSave,onClose,saving}){
   const isBehind=expectedPg!==null&&pg<expectedPg-15;
 
   return (
-    <div style={{background:"#f8fafc",borderTop:"2px solid #dbeafe",padding:"16px 20px 18px",animation:"fadeUp 0.18s ease"}}>
+    <div style={{background:DK.bg2(),borderTop:"2px solid #dbeafe",padding:"16px 20px 18px",animation:"fadeUp 0.18s ease"}}>
       {/* Long-running job warning banner */}
       {isLongRunning&&<div style={{marginBottom:12,padding:"8px 14px",borderRadius:8,background:isBehind?"#fef2f2":"#fefce8",border:`1px solid ${isBehind?"#fca5a5":"#fde047"}`,display:"flex",alignItems:"center",gap:8,fontSize:12}}>
         <span style={{fontSize:15}}>{isBehind?"⚠️":"⏳"}</span>
@@ -552,7 +599,7 @@ function JobDetailPanel({job,user,getUser,projects,lang,onSave,onClose,saving}){
               :(lang==="lo"?"ວຽກດໍາເນີນມາ "+daysRunning+" ວັນ":"Running for "+daysRunning+" days")}
           </span>
           {isBehind&&<span style={{color:"#dc2626",marginLeft:6}}>— expected ~{expectedPg}%, current {pg}%</span>}
-          {daysLeft!==null&&<span style={{color:"#94a3b8",marginLeft:6}}>· {daysLeft>0?daysLeft+" days left":Math.abs(daysLeft)+" days overdue"}</span>}
+          {daysLeft!==null&&<span style={{color:DK.txt5(),marginLeft:6}}>· {daysLeft>0?daysLeft+" days left":Math.abs(daysLeft)+" days overdue"}</span>}
         </div>
       </div>}
 
@@ -560,8 +607,8 @@ function JobDetailPanel({job,user,getUser,projects,lang,onSave,onClose,saving}){
         {/* LEFT — Progress + Status */}
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {/* Progress card */}
-          <div style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:"1px solid #e8edf5"}}>
-            <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>{lang==="lo"?"ຄວາມຄືບໜ້າ":"Progress"}</div>
+          <div style={{background:DK.bg(),borderRadius:10,padding:"12px 14px",border:`1px solid ${DK.bdr2()}`}}>
+            <div style={{fontSize:10,fontWeight:700,color:DK.txt5(),textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>{lang==="lo"?"ຄວາມຄືບໜ້າ":"Progress"}</div>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
               {/* Mini ring */}
               <svg width="64" height="64" viewBox="0 0 100 100" style={{flexShrink:0}}>
@@ -588,9 +635,9 @@ function JobDetailPanel({job,user,getUser,projects,lang,onSave,onClose,saving}){
                     onBlur={e=>{const v=Math.min(100,Math.max(0,+e.target.value||0));mark("progress",v);}}
                     onKeyDown={e=>e.key==="Enter"&&mark("progress",Math.min(100,Math.max(0,+pgInput||0)))}
                     readOnly={!canEdit}
-                    style={{...IS,width:58,textAlign:"center",padding:"4px 6px",fontSize:13,fontWeight:700}}/>
-                  <span style={{fontSize:11,color:"#94a3b8"}}>%</span>
-                  {expectedPg!==null&&<span style={{fontSize:10,color:"#94a3b8",marginLeft:2}}>expected {expectedPg}%</span>}
+                    style={{...IS(),width:58,textAlign:"center",padding:"4px 6px",fontSize:13,fontWeight:700}}/>
+                  <span style={{fontSize:11,color:DK.txt5()}}>%</span>
+                  {expectedPg!==null&&<span style={{fontSize:10,color:DK.txt5(),marginLeft:2}}>expected {expectedPg}%</span>}
                 </div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                   {[0,10,25,50,75,90,100].map(v=>(
@@ -603,15 +650,15 @@ function JobDetailPanel({job,user,getUser,projects,lang,onSave,onClose,saving}){
               </div>
             </div>
             {/* Days info */}
-            {(daysRunning!==null||daysLeft!==null)&&<div style={{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid #f1f5f9",fontSize:10,color:"#94a3b8"}}>
+            {(daysRunning!==null||daysLeft!==null)&&<div style={{display:"flex",gap:8,paddingTop:8,borderTop:`1px solid ${DK.bdr3()}`,fontSize:10,color:DK.txt5()}}>
               {daysRunning!==null&&<span>▶ {daysRunning}d {lang==="lo"?"ແລ້ວ":"running"}</span>}
               {daysLeft!==null&&<span style={{color:daysLeft<0?"#dc2626":daysLeft<3?"#f59e0b":"#94a3b8",fontWeight:daysLeft<3?700:400}}>{daysLeft<0?"⚠ "+Math.abs(daysLeft)+"d overdue":daysLeft===0?"Due today":"◷ "+daysLeft+"d left"}</span>}
             </div>}
           </div>
 
           {/* Status buttons — compact 2-col */}
-          <div style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:"1px solid #e8edf5"}}>
-            <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5,marginBottom:8}}>{lang==="lo"?"ສະຖານະ":"Status"}</div>
+          <div style={{background:DK.bg(),borderRadius:10,padding:"12px 14px",border:`1px solid ${DK.bdr2()}`}}>
+            <div style={{fontSize:10,fontWeight:700,color:DK.txt5(),textTransform:"uppercase",letterSpacing:0.5,marginBottom:8}}>{lang==="lo"?"ສະຖານະ":"Status"}</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}}>
               {Object.entries(STATUS).map(([k,v])=>(
                 <button key={k} onClick={()=>canEdit&&mark("status",k)} disabled={!canEdit}
@@ -626,9 +673,9 @@ function JobDetailPanel({job,user,getUser,projects,lang,onSave,onClose,saving}){
         </div>
 
         {/* RIGHT — Notes Checklist */}
-        <div style={{background:"#fff",borderRadius:10,padding:"14px 16px",border:"1px solid #e8edf5",display:"flex",flexDirection:"column"}}>
+        <div style={{background:DK.bg(),borderRadius:10,padding:"14px 16px",border:`1px solid ${DK.bdr2()}`,display:"flex",flexDirection:"column"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>
+            <div style={{fontSize:10,fontWeight:700,color:DK.txt5(),textTransform:"uppercase",letterSpacing:0.5}}>
               ☑ {lang==="lo"?"ລາຍການ / ຄວາມຄືບໜ້າ":"Checklist / Progress Log"}
             </div>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -637,8 +684,8 @@ function JobDetailPanel({job,user,getUser,projects,lang,onSave,onClose,saving}){
             </div>
           </div>
           <NoteChecklist raw={notes} onChange={v=>{setNotes(v);setDirty(true);}} canEdit={canEdit} lang={lang}/>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,paddingTop:8,borderTop:"1px solid #f1f5f9"}}>
-            <div style={{fontSize:11,color:"#94a3b8"}}>{lang==="lo"?"ອັບເດດລ່າສຸດ: ":"Last updated: "}{cleanDate(job.updated_at)}</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,paddingTop:8,borderTop:`1px solid ${DK.bdr3()}`}}>
+            <div style={{fontSize:11,color:DK.txt5()}}>{lang==="lo"?"ອັບເດດລ່າສຸດ: ":"Last updated: "}{cleanDate(job.updated_at)}</div>
             {dirty&&<span style={{fontSize:11,color:"#f59e0b",fontWeight:600}}>● {lang==="lo"?"ມີການປ່ຽນແປງ":"Unsaved changes"}</span>}
           </div>
         </div>
@@ -646,7 +693,7 @@ function JobDetailPanel({job,user,getUser,projects,lang,onSave,onClose,saving}){
 
       {/* Action bar */}
       <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:12}}>
-        <button onClick={onClose} style={{padding:"6px 16px",borderRadius:8,border:"1px solid #e2e8f0",background:"#fff",color:"#64748b",fontWeight:600,fontSize:13,cursor:"pointer"}}>{lang==="lo"?"ປິດ":"Close"}</button>
+        <button onClick={onClose} style={{padding:"6px 16px",borderRadius:8,border:`1px solid ${DK.bdr()}`,background:DK.bg(),color:DK.txt4(),fontWeight:600,fontSize:13,cursor:"pointer"}}>{lang==="lo"?"ປິດ":"Close"}</button>
         {canEdit&&<button onClick={handleSave} disabled={saving||!dirty}
           style={{...BS(dirty?"#16a34a":"#94a3b8"),padding:"6px 20px",fontSize:13,opacity:(saving||!dirty)?0.55:1,cursor:dirty&&!saving?"pointer":"default"}}>
           {saving?(lang==="lo"?"ກໍາລັງບັນທຶກ...":"Saving..."):(lang==="lo"?"💾 ບັນທຶກ":"💾 Save")}
@@ -657,7 +704,7 @@ function JobDetailPanel({job,user,getUser,projects,lang,onSave,onClose,saving}){
 }
 
 // ── JOBS PAGE — grouped by project, click row to expand ────────
-function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,projects,users,user,getUser,onEdit,onDelete,onInlineUpdate,lang,loading,saving}){
+function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,projects,users,user,getUser,onEdit,onDelete,onInlineUpdate,lang,loading,saving,dark=false}){
   const t=T[lang];
   const [fStatus,setFStatus]=useState("all");
   const [fPri,setFPri]=useState("all");
@@ -708,12 +755,12 @@ function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,p
 
   return <div style={{animation:"fadeUp 0.3s ease"}}>
     {/* FILTER BAR */}
-    <div style={{background:"#fff",borderRadius:12,padding:"13px 16px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+    <div style={{background:dark?"#161b22":"#ffffff",borderRadius:12,padding:"11px 14px",marginBottom:12,boxShadow:dark?"0 1px 4px rgba(0,0,0,0.4)":"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${dark?"#2d3748":"#e8edf5"}`}}>
       <div style={{display:"flex",gap:9,alignItems:"center",flexWrap:"nowrap",overflowX:"auto"}}>
         <div style={{position:"relative",flexShrink:0,minWidth:170}}>
-          <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"#94a3b8",fontSize:13,pointerEvents:"none"}}>🔍</span>
+          <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:DK.txt5(),fontSize:13,pointerEvents:"none"}}>🔍</span>
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder={t.search}
-            style={{...SS,paddingLeft:30,borderRadius:20,background:"#f8fafc",border:"1px solid #e8edf5",minWidth:170}}/>
+            style={{...SS(),paddingLeft:30,borderRadius:20,background:DK.bg2(),border:`1px solid ${DK.bdr2()}`,minWidth:170}}/>
         </div>
         {[
           {val:fStatus,set:setFStatus,label:t.allStatus,opts:Object.entries(STATUS).map(([k,v])=>({k,l:v[lang]||v.en}))},
@@ -723,21 +770,21 @@ function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,p
         ].map((dd,i)=>(
           <div key={i} style={{position:"relative",flexShrink:0}}>
             <select value={dd.val} onChange={e=>dd.set(e.target.value)}
-              style={{...SS,paddingRight:26,appearance:"none",WebkitAppearance:"none",background:"#fff",border:"1px solid #e2e8f0",borderRadius:8,minWidth:i===2?155:115,fontWeight:dd.val!=="all"?600:400,color:dd.val!=="all"?"#1e293b":"#64748b",cursor:"pointer"}}>
+              style={{...SS(),paddingRight:26,appearance:"none",WebkitAppearance:"none",background:DK.bg(),border:`1px solid ${DK.bdr()}`,borderRadius:8,minWidth:i===2?155:115,fontWeight:dd.val!=="all"?600:400,color:dd.val!=="all"?"#1e293b":"#64748b",cursor:"pointer"}}>
               <option value="all">{dd.label}</option>
               {dd.opts.map(o=><option key={o.k} value={o.k}>{o.l}</option>)}
             </select>
-            <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#94a3b8",fontSize:10}}>▼</span>
+            <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:DK.txt5(),fontSize:10}}>▼</span>
           </div>
         ))}
-        <label style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:"#64748b",cursor:"pointer",userSelect:"none",flexShrink:0,whiteSpace:"nowrap"}}>
+        <label style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:DK.txt4(),cursor:"pointer",userSelect:"none",flexShrink:0,whiteSpace:"nowrap"}}>
           <input type="checkbox" checked={showDone} onChange={e=>setShowDone(e.target.checked)} style={{cursor:"pointer"}}/>{t.showDone}
         </label>
-        <label style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:"#64748b",cursor:"pointer",userSelect:"none",flexShrink:0,whiteSpace:"nowrap"}}>
+        <label style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:DK.txt4(),cursor:"pointer",userSelect:"none",flexShrink:0,whiteSpace:"nowrap"}}>
           <input type="checkbox" checked={showHrs} onChange={e=>setShowHrs(e.target.checked)} style={{cursor:"pointer"}}/>{lang==="lo"?"ສະແດງຊມ":"Show Hrs"}
         </label>
         {hasFilter&&<button onClick={clearAll} style={{padding:"6px 12px",borderRadius:8,border:"1px solid #fca5a5",background:"#fef2f2",color:"#dc2626",fontSize:12,fontWeight:600,whiteSpace:"nowrap",flexShrink:0,cursor:"pointer"}}>✕ {lang==="lo"?"ລ້າງ":"Clear"}</button>}
-        <span style={{marginLeft:"auto",color:"#94a3b8",fontSize:12,whiteSpace:"nowrap",flexShrink:0}}>{filtered.length} {lang==="lo"?"ວຽກ":"jobs"}</span>
+        <span style={{marginLeft:"auto",color:DK.txt5(),fontSize:12,whiteSpace:"nowrap",flexShrink:0}}>{filtered.length} {lang==="lo"?"ວຽກ":"jobs"}</span>
       </div>
       {dashFilter&&<div style={{marginTop:7,display:"flex",alignItems:"center",gap:6}}>
         <span style={{fontSize:11,padding:"2px 10px",borderRadius:99,background:dashFilter==="overdue"?"#fef2f2":dashFilter==="done"?"#f0fdf4":"#eff6ff",color:dashFilter==="overdue"?"#dc2626":dashFilter==="done"?"#16a34a":"#2563eb",fontWeight:700}}>
@@ -746,46 +793,52 @@ function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,p
         <button onClick={clearAll} style={{fontSize:11,color:"#dc2626",background:"none",border:"none",fontWeight:700,cursor:"pointer"}}>✕</button>
       </div>}
       {fProj!=="all"&&<div style={{marginTop:7,display:"flex",alignItems:"center",gap:6}}>
-        <span style={{fontSize:11,color:"#64748b"}}>Project: <strong style={{color:"#2563eb"}}>{projects.find(p=>p.id===fProj)?.[lang==="lo"?"name_lao":"name"]||projects.find(p=>p.id===fProj)?.name}</strong></span>
+        <span style={{fontSize:11,color:DK.txt4()}}>Project: <strong style={{color:"#2563eb"}}>{projects.find(p=>p.id===fProj)?.[lang==="lo"?"name_lao":"name"]||projects.find(p=>p.id===fProj)?.name}</strong></span>
         <button onClick={()=>{setFProj("all");setFilterProj(null);}} style={{fontSize:11,color:"#dc2626",background:"none",border:"none",fontWeight:700,cursor:"pointer"}}>✕</button>
       </div>}
     </div>
 
     {/* GROUPED TABLE */}
-    <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
-      {loading&&<div style={{textAlign:"center",padding:32,color:"#94a3b8"}}>⏳ {t.loading}</div>}
-      {!loading&&filtered.length===0&&<div style={{textAlign:"center",padding:40,color:"#94a3b8"}}>{t.noJobs}</div>}
+    <div style={{background:dark?"#161b22":"#ffffff",borderRadius:12,boxShadow:dark?"0 1px 4px rgba(0,0,0,0.4)":"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden",border:`1px solid ${dark?"#2d3748":"#e8edf5"}`}}>
+      {loading&&<div style={{textAlign:"center",padding:32,color:DK.txt5()}}>⏳ {t.loading}</div>}
+      {!loading&&filtered.length===0&&<div style={{textAlign:"center",padding:40,color:DK.txt5()}}>{t.noJobs}</div>}
       {grouped.map(({proj,jobs:pJobs})=>{
         const pid=proj?.id||"__none__";
         const isCollapsed=collapsedProj[pid];
         const projColor=sc[proj?.status]||"#94a3b8";
         const dnCount=pJobs.filter(j=>j.status==="done").length;
         return (
-          <div key={pid} style={{borderBottom:"2px solid #f0f4f8"}}>
-            {/* PROJECT GROUP HEADER — clickable to collapse */}
+          <div key={pid} style={{borderBottom:`2px solid ${dark?"#1a2235":"#e8edf5"}`}}>
+            {/* ── PROJECT GROUP HEADER ── */}
             <div onClick={()=>toggleProj(pid)}
-              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 16px",background:"#f8fafc",cursor:"pointer",userSelect:"none",borderBottom:"1px solid #e8edf5"}}
-              onMouseEnter={e=>e.currentTarget.style.background="#eef2f7"}
-              onMouseLeave={e=>e.currentTarget.style.background="#f8fafc"}>
-              <span style={{fontSize:11,color:"#94a3b8",display:"inline-block",transition:"transform 0.2s",transform:isCollapsed?"rotate(-90deg)":"rotate(0deg)"}}>▾</span>
-              {proj&&<div style={{width:10,height:10,borderRadius:2,background:projColor,flexShrink:0}}/>}
-              <span style={{fontWeight:700,color:"#0f172a",fontSize:13}}>{proj?(lang==="lo"&&proj.name_lao?proj.name_lao:proj.name):(lang==="lo"?"ບໍ່ມີໂຄງການ":"No Project")}</span>
-              {proj&&<span style={{fontSize:10,padding:"1px 7px",borderRadius:99,background:projColor+"18",color:projColor,fontWeight:700,textTransform:"capitalize"}}>{proj.status}</span>}
-              <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
+              style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",
+                background:dark?"#141d2b":"#e8eef8",
+                cursor:"pointer",userSelect:"none",
+                borderLeft:`4px solid ${projColor}`,
+                borderBottom:`1px solid ${dark?"#1e2d40":"#cdd6e8"}`}}
+              onMouseEnter={e=>e.currentTarget.style.background=dark?"#1a2438":"#dde7f5"}
+              onMouseLeave={e=>e.currentTarget.style.background=dark?"#141d2b":"#e8eef8"}>
+              <span style={{fontSize:10,color:projColor,transition:"transform 0.2s",transform:isCollapsed?"rotate(-90deg)":"rotate(0deg)",flexShrink:0}}>▾</span>
+              <div style={{width:8,height:8,borderRadius:2,background:projColor,flexShrink:0}}/>
+              <span style={{fontWeight:800,color:dark?"#c7d4e8":"#1e3a5f",fontSize:13,letterSpacing:0.1}}>
+                {proj?(lang==="lo"&&proj.name_lao?proj.name_lao:proj.name):(lang==="lo"?"ບໍ່ມີໂຄງການ":"No Project")}
+              </span>
+              {proj&&<span style={{fontSize:10,padding:"1px 7px",borderRadius:99,background:projColor+"25",color:projColor,fontWeight:700,textTransform:"capitalize"}}>{proj.status}</span>}
+              <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
                 <div style={{display:"flex",alignItems:"center",gap:5}}>
-                  <div style={{width:56,height:4,background:"#e2e8f0",borderRadius:99,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${pJobs.length?Math.round(dnCount/pJobs.length*100):0}%`,background:projColor,borderRadius:99}}/>
+                  <div style={{width:64,height:5,background:dark?"#1e2d3d":"#c8d4e8",borderRadius:99,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${pJobs.length?Math.round(dnCount/pJobs.length*100):0}%`,background:projColor,borderRadius:99,transition:"width 0.4s"}}/>
                   </div>
-                  <span style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>{dnCount}/{pJobs.length}</span>
+                  <span style={{fontSize:11,color:dark?"#94a3b8":"#4a6480",fontWeight:700}}>{dnCount}/{pJobs.length}</span>
                 </div>
               </div>
             </div>
             {/* JOB ROWS */}
             {!isCollapsed&&<>
-              {/* Column headers (shown once per group) */}
-              <div style={{display:"grid",gridTemplateColumns:"32px 1fr 130px 100px 100px 80px 75px 90px"+(showHrs?" 80px":"")+" 90px",background:"#fafbfc",borderBottom:"1px solid #e8edf5",padding:"0 0"}}>
-                {["","Job Title","Category","Assignee","Status","Priority","Due","Progress",...(showHrs?["Hours"]:[]),"Actions"].map((h,i)=>(
-                  <div key={i} style={{padding:"7px 10px",fontSize:10,fontWeight:700,color:"#b0bec5",textTransform:"uppercase",letterSpacing:0.4,overflow:"hidden",whiteSpace:"nowrap"}}>{h}</div>
+              {/* Column headers */}
+              <div style={{display:"grid",gridTemplateColumns:"28px 1fr 120px 100px 100px 76px 72px 88px"+(showHrs?" 78px":"")+" 90px",background:dark?"#111827":"#f5f7fc",borderBottom:`1px solid ${dark?"#1e2d40":"#dde5f0"}`,padding:"0 0"}}>
+                {["","Job","Category","Assignee","Status","Priority","Due","Progress",...(showHrs?["Hours"]:[]),"Actions"].map((h,i)=>(
+                  <div key={i} style={{padding:"6px 10px",fontSize:9,fontWeight:700,color:dark?"#4a5a7a":"#8899aa",textTransform:"uppercase",letterSpacing:0.5,overflow:"hidden",whiteSpace:"nowrap"}}>{h}</div>
                 ))}
               </div>
               {pJobs.map(j=>{
@@ -793,18 +846,20 @@ function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,p
                 const pg=Number(j.progress)||0;
                 const isExpanded=expandedId===j.id;
                 return (
-                  <div key={j.id} style={{borderBottom:"1px solid #f1f5f9"}}>
+                  <div key={j.id} style={{borderBottom:`1px solid ${dark?"#1a2235":"#edf1f7"}`}}>
                     {/* ROW */}
                     <div onClick={()=>toggleRow(j.id)}
-                      style={{display:"grid",gridTemplateColumns:"32px 1fr 130px 100px 100px 80px 75px 90px"+(showHrs?" 80px":"")+" 90px",alignItems:"center",background:isExpanded?"#eff6ff":"",opacity:j.status==="done"?0.65:1,cursor:"pointer",transition:"background 0.1s"}}
-                      onMouseEnter={e=>{if(!isExpanded)e.currentTarget.style.background="#f8fafc";}}
-                      onMouseLeave={e=>{if(!isExpanded)e.currentTarget.style.background="";}}>
+                      style={{display:"grid",gridTemplateColumns:"28px 1fr 120px 100px 100px 76px 72px 88px"+(showHrs?" 78px":"")+" 90px",alignItems:"center",
+                        background:isExpanded?(dark?"#1e2d4a":"#eff6ff"):(dark?"#161b22":"#ffffff"),
+                        opacity:j.status==="done"?0.6:1,cursor:"pointer",transition:"background 0.1s"}}
+                      onMouseEnter={e=>{if(!isExpanded)e.currentTarget.style.background=dark?"#1a2235":"#f4f7fc";}}
+                      onMouseLeave={e=>{if(!isExpanded)e.currentTarget.style.background=dark?"#161b22":"#ffffff";}}>
                       {/* Chevron */}
-                      <div style={{padding:"0 0 0 12px",color:"#94a3b8",fontSize:10,transition:"transform 0.2s",transform:isExpanded?"rotate(90deg)":"rotate(0deg)"}}>▶</div>
+                      <div style={{padding:"0 0 0 10px",color:dark?"#4a5a7a":"#c0cdd8",fontSize:9,transition:"transform 0.2s",transform:isExpanded?"rotate(90deg)":"rotate(0deg)"}}>▶</div>
                       {/* Title */}
-                      <div style={{padding:"10px 10px 10px 4px"}}>
-                        <div style={{fontWeight:600,color:"#1e293b",fontSize:13,lineHeight:1.3}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
-                        <div style={{color:"#94a3b8",fontSize:11,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.description||""}</div>
+                      <div style={{padding:"9px 8px 9px 2px"}}>
+                        <div style={{fontWeight:600,color:dark?"#dde6f0":"#1e293b",fontSize:13,lineHeight:1.3}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+                        <div style={{color:dark?"#4a5a7a":"#94a3b8",fontSize:11,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.description||""}</div>
                       </div>
                       <div style={{padding:"10px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:99,background:"#f0f9ff",color:"#0369a1",fontWeight:600,display:"inline-block",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{j.category||"—"}</span></div>
                       <div style={{padding:"10px"}}><Avtr user={getUser(j.assignee_id)} size={22} showName/></div>
@@ -813,22 +868,22 @@ function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,p
                       <div style={{padding:"10px",color:od?"#dc2626":"#64748b",fontWeight:od?700:400,fontSize:12,whiteSpace:"nowrap"}}>{fmtDate(j.due_date,od)}</div>
                       <div style={{padding:"10px"}}>
                         <div style={{display:"flex",alignItems:"center",gap:4}}>
-                          <div style={{flex:1,height:5,background:"#f1f5f9",borderRadius:99,overflow:"hidden",minWidth:36}}>
+                          <div style={{flex:1,height:5,background:DK.bg3(),borderRadius:99,overflow:"hidden",minWidth:36}}>
                             <div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":"#3b82f6",borderRadius:99,transition:"width 0.4s"}}/>
                           </div>
-                          <span style={{color:"#64748b",fontSize:11,fontWeight:600,flexShrink:0}}>{pg}%</span>
+                          <span style={{color:DK.txt4(),fontSize:11,fontWeight:600,flexShrink:0}}>{pg}%</span>
                         </div>
                       </div>
-                      {showHrs&&<div style={{padding:"10px",color:"#94a3b8",fontSize:12,whiteSpace:"nowrap"}}>{j.estimated_hours||0}h/{j.actual_hours||0}h</div>}
+                      {showHrs&&<div style={{padding:"10px",color:DK.txt5(),fontSize:12,whiteSpace:"nowrap"}}>{j.estimated_hours||0}h/{j.actual_hours||0}h</div>}
                       <div style={{padding:"10px"}} onClick={e=>e.stopPropagation()}>
                         {user.role==="leader"&&<div style={{display:"flex",gap:4}}>
                           <button onClick={()=>onEdit(j)} style={{...BS("#2563eb"),padding:"4px 8px",fontSize:11}}>{t.edit}</button>
                           <button onClick={()=>onDelete(j.id)} style={{...BS("#dc2626"),padding:"4px 8px",fontSize:11}}>{t.del}</button>
-                          <button onClick={()=>printJobCard(j,projects,getUser,lang)} title="Print Card" style={{width:26,height:26,borderRadius:6,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}>🖨</button>
+                          <button onClick={()=>printJobCard(j,projects,getUser,lang)} title="Print Card" style={{width:26,height:26,borderRadius:6,border:`1px solid ${DK.bdr()}`,background:DK.bg(),cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}>🖨</button>
                         </div>}
                         {user.role!=="leader"&&j.assignee_id===user.id&&<div style={{display:"flex",gap:4,alignItems:"center"}}>
-                          <span style={{fontSize:10,color:"#94a3b8"}}>↕ expand</span>
-                          <button onClick={()=>printJobCard(j,projects,getUser,lang)} title="Print Card" style={{width:22,height:22,borderRadius:5,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>🖨</button>
+                          <span style={{fontSize:10,color:DK.txt5()}}>↕ expand</span>
+                          <button onClick={()=>printJobCard(j,projects,getUser,lang)} title="Print Card" style={{width:22,height:22,borderRadius:5,border:`1px solid ${DK.bdr()}`,background:DK.bg(),cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>🖨</button>
                         </div>}
                       </div>
                     </div>
@@ -854,14 +909,14 @@ function ProjectsPage({projects,jobs,user,getUser,onSelectProj,onEdit,onDelete,l
   const sc={active:"#2563eb",planning:"#7c3aed",completed:"#16a34a",paused:"#f59e0b"};
   return <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16,animation:"fadeUp 0.3s ease"}}>
     {projects.map(p=>{const pj=jobs.filter(j=>j.project_id===p.id),dn=pj.filter(j=>j.status==="done").length,pct=pj.length?Math.round((dn/pj.length)*100):0;
-    return <div key={p.id} style={{background:"#fff",borderRadius:14,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`4px solid ${sc[p.status]||"#94a3b8"}`}}>
-      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><div style={{fontSize:14,fontWeight:700,color:"#0f172a"}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div><PriDot priority={p.priority} lang={lang}/></div>
+    return <div key={p.id} style={{background:DK.bg(),borderRadius:14,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`4px solid ${sc[p.status]||"#94a3b8"}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><div style={{fontSize:14,fontWeight:700,color:DK.txt()}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div><PriDot priority={p.priority} lang={lang}/></div>
       <div style={{fontSize:11,padding:"2px 8px",borderRadius:99,background:"#f0f9ff",color:"#0369a1",fontWeight:600,display:"inline-block",marginBottom:10}}>{p.category}</div>
-      <div style={{color:"#64748b",fontSize:12,marginBottom:12,lineHeight:1.5}}>{p.description}</div>
-      <div style={{marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#64748b",marginBottom:3}}><span>{dn}/{pj.length} {t.tasksDone}</span><span>{pct}%</span></div><div style={{height:6,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,background:pct===100?"#16a34a":"linear-gradient(90deg,#3b82f6,#7c3aed)",borderRadius:99}}/></div></div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><Avtr user={getUser(p.leader_id)} size={24} showName/><div style={{fontSize:11,color:"#94a3b8"}}>{t.due} {p.due_date}</div></div>
+      <div style={{color:DK.txt4(),fontSize:12,marginBottom:12,lineHeight:1.5}}>{p.description}</div>
+      <div style={{marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:DK.txt4(),marginBottom:3}}><span>{dn}/{pj.length} {t.tasksDone}</span><span>{pct}%</span></div><div style={{height:6,background:DK.bg3(),borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,background:pct===100?"#16a34a":"linear-gradient(90deg,#3b82f6,#7c3aed)",borderRadius:99}}/></div></div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><Avtr user={getUser(p.leader_id)} size={24} showName/><div style={{fontSize:11,color:DK.txt5()}}>{t.due} {p.due_date}</div></div>
       <div style={{display:"flex",gap:6}}>
-        <button onClick={()=>onSelectProj(p.id)} style={{...BS("#f8fafc"),flex:1,color:"#374151",border:"1px solid #e2e8f0",padding:"8px"}}>{t.viewJobs}</button>
+        <button onClick={()=>onSelectProj(p.id)} style={{...BS("#f8fafc"),flex:1,color:DK.txt3(),border:`1px solid ${DK.bdr()}`,padding:"8px"}}>{t.viewJobs}</button>
         {user.role==="leader"&&<><button onClick={()=>onEdit(p)} style={{...BS("#2563eb"),padding:"8px 11px",fontSize:12}}>{t.edit}</button><button onClick={()=>onDelete(p.id)} style={{...BS("#dc2626"),padding:"8px 11px",fontSize:12}}>{t.del}</button></>}
       </div>
     </div>;})}
@@ -877,16 +932,16 @@ function TeamPage({users,jobs,user,onAddUser,onEditUser,onDeleteUser,lang}){
     </div>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:16}}>
       {users.map(u=>{const my=jobs.filter(j=>j.assignee_id===u.id),dn=my.filter(j=>j.status==="done").length,ac=my.filter(j=>j.status==="in-progress").length,hrs=my.reduce((s,j)=>s+(Number(j.actual_hours)||0),0);
-      return <div key={u.id} style={{background:"#fff",borderRadius:14,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+      return <div key={u.id} style={{background:DK.bg(),borderRadius:14,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
           <div style={{width:46,height:46,borderRadius:"50%",background:u.role==="leader"?"linear-gradient(135deg,#3b82f6,#7c3aed)":"linear-gradient(135deg,#06b6d4,#10b981)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,color:"#fff"}}>{u.avatar||(u.name||"?")[0]}</div>
-          <div><div style={{fontWeight:700,color:"#0f172a",fontSize:14}}>{u.name}</div>{u.name_lao&&<div style={{fontSize:11,color:"#64748b"}}>{u.name_lao}</div>}<div style={{fontSize:11,color:u.role==="leader"?"#7c3aed":"#0891b2",fontWeight:700,textTransform:"uppercase"}}>{u.role==="leader"?t.leader:t.runner}</div></div>
+          <div><div style={{fontWeight:700,color:DK.txt(),fontSize:14}}>{u.name}</div>{u.name_lao&&<div style={{fontSize:11,color:DK.txt4()}}>{u.name_lao}</div>}<div style={{fontSize:11,color:u.role==="leader"?"#7c3aed":"#0891b2",fontWeight:700,textTransform:"uppercase"}}>{u.role==="leader"?t.leader:t.runner}</div></div>
         </div>
-        <div style={{color:"#64748b",fontSize:12,marginBottom:10}}>📁 {u.department}</div>
+        <div style={{color:DK.txt4(),fontSize:12,marginBottom:10}}>📁 {u.department}</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
-          {[["Total",my.length,"#2563eb"],["Done",dn,"#16a34a"],["Active",ac,"#f59e0b"]].map(([l,v,c])=><div key={l} style={{textAlign:"center",padding:"8px 4px",background:"#f8fafc",borderRadius:8}}><div style={{fontSize:18,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:10,color:"#94a3b8"}}>{l}</div></div>)}
+          {[["Total",my.length,"#2563eb"],["Done",dn,"#16a34a"],["Active",ac,"#f59e0b"]].map(([l,v,c])=><div key={l} style={{textAlign:"center",padding:"8px 4px",background:DK.bg2(),borderRadius:8}}><div style={{fontSize:18,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:10,color:DK.txt5()}}>{l}</div></div>)}
         </div>
-        <div style={{fontSize:11,color:"#64748b",borderTop:"1px solid #f1f5f9",paddingTop:8,marginBottom:user.role==="leader"?8:0}}>⏱ {hrs}h {t.hrsLogged}</div>
+        <div style={{fontSize:11,color:DK.txt4(),borderTop:`1px solid ${DK.bdr3()}`,paddingTop:8,marginBottom:user.role==="leader"?8:0}}>⏱ {hrs}h {t.hrsLogged}</div>
         {user.role==="leader"&&<div style={{display:"flex",gap:6}}>
           <button onClick={()=>onEditUser(u)} style={{...BS("#2563eb"),flex:1,padding:"6px",fontSize:11}}>{t.edit}</button>
           {u.id!==user.id&&<button onClick={()=>onDeleteUser(u.id)} style={{...BS("#dc2626"),padding:"6px 10px",fontSize:11}}>{t.del}</button>}
@@ -905,9 +960,9 @@ function MonthlyPage({monthly,jobs,user,users,projects,getUser,onSaveTemplate,on
   const isAct=tp=>tp.active===true||tp.active==="true"||tp.active===1||tp.active==="1";
   const [modal,setModal]=useState(null);
   return <div style={{animation:"fadeUp 0.3s ease"}}>
-    <div style={{background:"#fff",borderRadius:12,padding:18,marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+    <div style={{background:DK.bg(),borderRadius:12,padding:18,marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-        <div><div style={{fontSize:16,fontWeight:700,color:"#0f172a"}}>📅 {lang==="lo"?"ວຽກປະຈໍາເດືອນ":"Monthly Routine Jobs"}</div><div style={{color:"#64748b",fontSize:13,marginTop:2}}>{lang==="lo"?"ສ້າງແມ່ແບບ — ວຽກຈະສ້າງອັດຕະໂນມັດວັນທີ 1 (ຄົບກໍານົດ T+10)":"Create templates — auto-generated on 1st of month, due T+10"}</div></div>
+        <div><div style={{fontSize:16,fontWeight:700,color:DK.txt()}}>📅 {lang==="lo"?"ວຽກປະຈໍາເດືອນ":"Monthly Routine Jobs"}</div><div style={{color:DK.txt4(),fontSize:13,marginTop:2}}>{lang==="lo"?"ສ້າງແມ່ແບບ — ວຽກຈະສ້າງອັດຕະໂນມັດວັນທີ 1 (ຄົບກໍານົດ T+10)":"Create templates — auto-generated on 1st of month, due T+10"}</div></div>
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>setModal({type:"add"})} style={BS("#2563eb")}>{t.addTemplate}</button>
           {user.role==="leader"&&<button onClick={onGenerate} disabled={generating} style={{...BS("#059669"),opacity:generating?0.7:1}}>{generating?<><span className="spin">◌</span> ...</>:t.generateNow}</button>}
@@ -918,19 +973,19 @@ function MonthlyPage({monthly,jobs,user,users,projects,getUser,onSaveTemplate,on
       </div>}
     </div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-      <div style={{background:"#fff",borderRadius:12,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-        <div style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:14}}>📋 {lang==="lo"?"ແມ່ແບບຂອງຂ້ອຍ":"My Templates"} ({myTpls.length})</div>
-        {myTpls.length===0&&<div style={{color:"#94a3b8",fontSize:13,textAlign:"center",padding:"20px 0"}}>{lang==="lo"?"ຍັງບໍ່ມີ. ກົດ + ເພີ່ມ":"None yet. Click + Add Template"}</div>}
-        {myTpls.map(tp=><div key={tp.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #f1f5f9"}}>
+      <div style={{background:DK.bg(),borderRadius:12,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+        <div style={{fontSize:15,fontWeight:700,color:DK.txt(),marginBottom:14}}>📋 {lang==="lo"?"ແມ່ແບບຂອງຂ້ອຍ":"My Templates"} ({myTpls.length})</div>
+        {myTpls.length===0&&<div style={{color:DK.txt5(),fontSize:13,textAlign:"center",padding:"20px 0"}}>{lang==="lo"?"ຍັງບໍ່ມີ. ກົດ + ເພີ່ມ":"None yet. Click + Add Template"}</div>}
+        {myTpls.map(tp=><div key={tp.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${DK.bdr3()}`}}>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:600,color:"#1e293b",fontSize:13,display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+            <div style={{fontWeight:600,color:DK.txt2(),fontSize:13,display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
               {lang==="lo"&&tp.title_lao?tp.title_lao:tp.title}
               <span style={{fontSize:10,padding:"1px 6px",borderRadius:99,background:isAct(tp)?"#f0fdf4":"#f1f5f9",color:isAct(tp)?"#16a34a":"#94a3b8",fontWeight:700,flexShrink:0}}>{isAct(tp)?"Active":"Off"}</span>
               {tp.schedule&&tp.schedule!=="monthly"&&<span style={{fontSize:10,padding:"1px 7px",borderRadius:99,background:"#eff6ff",color:"#2563eb",fontWeight:700,flexShrink:0}}>
                 {tp.schedule==="biweekly"?"2x/mo":tp.schedule==="weekly"?"weekly":tp.schedule==="every_n_days"?`every ${tp.schedule_day}d`:""}
               </span>}
             </div>
-            <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>
+            <div style={{fontSize:11,color:DK.txt5(),marginTop:2}}>
               {tp.category} · {tp.estimated_hours}h · <PriDot priority={tp.priority} lang={lang}/>
               {tp.schedule&&tp.schedule!=="monthly"&&<span style={{marginLeft:4,color:"#2563eb"}}>
                 · {tp.schedule==="biweekly"?`Every 14d · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][Number(tp.schedule_day)||4]}`
@@ -946,19 +1001,19 @@ function MonthlyPage({monthly,jobs,user,users,projects,getUser,onSaveTemplate,on
           </div>
         </div>)}
         {user.role==="leader"&&monthly.filter(tp=>!myTpls.includes(tp)).length>0&&<>
-          <div style={{fontSize:12,fontWeight:700,color:"#94a3b8",margin:"14px 0 8px",textTransform:"uppercase",letterSpacing:0.5}}>Other Team Templates</div>
-          {monthly.filter(tp=>!myTpls.includes(tp)).map(tp=><div key={tp.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #f1f5f9",opacity:0.7}}>
-            <div><div style={{fontWeight:600,color:"#64748b",fontSize:12}}>{lang==="lo"&&tp.title_lao?tp.title_lao:tp.title}</div><Avtr user={getUser(tp.owner_id||tp.default_assignee_id)} size={13} showName/></div>
+          <div style={{fontSize:12,fontWeight:700,color:DK.txt5(),margin:"14px 0 8px",textTransform:"uppercase",letterSpacing:0.5}}>Other Team Templates</div>
+          {monthly.filter(tp=>!myTpls.includes(tp)).map(tp=><div key={tp.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${DK.bdr3()}`,opacity:0.7}}>
+            <div><div style={{fontWeight:600,color:DK.txt4(),fontSize:12}}>{lang==="lo"&&tp.title_lao?tp.title_lao:tp.title}</div><Avtr user={getUser(tp.owner_id||tp.default_assignee_id)} size={13} showName/></div>
             <span style={{fontSize:10,padding:"1px 6px",borderRadius:99,background:isAct(tp)?"#f0fdf4":"#f1f5f9",color:isAct(tp)?"#16a34a":"#94a3b8",fontWeight:700}}>{isAct(tp)?"Active":"Off"}</span>
           </div>)}
         </>}
       </div>
-      <div style={{background:"#fff",borderRadius:12,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-        <div style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:14}}>🗓 {String(m).padStart(2,"0")}/{y} Jobs</div>
-        {thisMo.length===0&&<div style={{color:"#94a3b8",fontSize:13}}>{lang==="lo"?"ຍັງບໍ່ມີວຽກ. ວຽກຈະສ້າງວັນທີ 1 ອັດຕະໂນມັດ":"No jobs yet. Auto-generates on 1st of month."}</div>}
-        {thisMo.map(j=>{const od=new Date(j.due_date)<new Date()&&j.status!=="done";const pg=Number(j.progress)||0;return <div key={j.id} style={{padding:"10px 0",borderBottom:"1px solid #f1f5f9"}}>
+      <div style={{background:DK.bg(),borderRadius:12,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+        <div style={{fontSize:15,fontWeight:700,color:DK.txt(),marginBottom:14}}>🗓 {String(m).padStart(2,"0")}/{y} Jobs</div>
+        {thisMo.length===0&&<div style={{color:DK.txt5(),fontSize:13}}>{lang==="lo"?"ຍັງບໍ່ມີວຽກ. ວຽກຈະສ້າງວັນທີ 1 ອັດຕະໂນມັດ":"No jobs yet. Auto-generates on 1st of month."}</div>}
+        {thisMo.map(j=>{const od=new Date(j.due_date)<new Date()&&j.status!=="done";const pg=Number(j.progress)||0;return <div key={j.id} style={{padding:"10px 0",borderBottom:`1px solid ${DK.bdr3()}`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-            <div style={{flex:1}}><div style={{fontWeight:600,color:"#1e293b",fontSize:13}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div><div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}><Badge status={j.status} lang={lang}/><PriDot priority={j.priority} lang={lang}/><Avtr user={getUser(j.assignee_id)} size={15} showName/>{od&&<span style={{fontSize:10,color:"#dc2626",fontWeight:700}}>⚠</span>}</div><div style={{display:"flex",alignItems:"center",gap:5,marginTop:5}}><div style={{flex:1,height:4,background:"#f1f5f9",borderRadius:99}}><div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":"#3b82f6",borderRadius:99}}/></div><span style={{fontSize:10,color:"#94a3b8"}}>{pg}%</span></div></div>
+            <div style={{flex:1}}><div style={{fontWeight:600,color:DK.txt2(),fontSize:13}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div><div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}><Badge status={j.status} lang={lang}/><PriDot priority={j.priority} lang={lang}/><Avtr user={getUser(j.assignee_id)} size={15} showName/>{od&&<span style={{fontSize:10,color:"#dc2626",fontWeight:700}}>⚠</span>}</div><div style={{display:"flex",alignItems:"center",gap:5,marginTop:5}}><div style={{flex:1,height:4,background:DK.bg3(),borderRadius:99}}><div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":"#3b82f6",borderRadius:99}}/></div><span style={{fontSize:10,color:DK.txt5()}}>{pg}%</span></div></div>
             <div style={{fontSize:11,color:od?"#dc2626":"#94a3b8",marginLeft:10,whiteSpace:"nowrap"}}>{j.due_date}</div>
           </div>
         </div>;})}
@@ -1043,18 +1098,18 @@ function TemplateModal({initial,onClose,onSave,user,users,projects,lang}){
 
   return <Modal title={initial?(lang==="lo"?"ແກ້ໄຂແມ່ແບບ":"Edit Template"):(lang==="lo"?"ແມ່ແບບໃໝ່":"New Template")} onClose={onClose} onSave={()=>onSave(f)} wide>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (EN)"}><input value={f.title} onChange={e=>set("title",e.target.value)} style={IS}/></Lbl></div>
-      <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (ລາວ)"}><input value={f.title_lao||""} onChange={e=>set("title_lao",e.target.value)} style={IS}/></Lbl></div>
-      <div style={{gridColumn:"1/-1"}}><Lbl label={t.desc}><textarea value={f.description||""} onChange={e=>set("description",e.target.value)} style={{...IS,height:50,resize:"vertical"}}/></Lbl></div>
-      <Lbl label={t.category}><select value={f.category||""} onChange={e=>set("category",e.target.value)} style={IS}>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select></Lbl>
-      <Lbl label={t.priority}><select value={f.priority} onChange={e=>set("priority",e.target.value)} style={IS}>{Object.entries(PRIORITY).map(([k,v])=><option key={k} value={k}>{v[lang]||v.en}</option>)}</select></Lbl>
-      <Lbl label={t.project}><select value={f.project_id||""} onChange={e=>set("project_id",e.target.value)} style={IS}><option value="">-- None --</option>{projects.map(p=><option key={p.id} value={p.id}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</option>)}</select></Lbl>
-      <Lbl label={t.estHrs}><input type="number" min="1" value={f.estimated_hours||8} onChange={e=>set("estimated_hours",+e.target.value)} style={IS}/></Lbl>
-      {user.role==="leader"&&<div style={{gridColumn:"1/-1"}}><Lbl label={t.assignee+" (default)"}><select value={f.default_assignee_id||user.id} onChange={e=>set("default_assignee_id",e.target.value)} style={IS}>{users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Lbl></div>}
+      <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (EN)"}><input value={f.title} onChange={e=>set("title",e.target.value)} style={IS()}/></Lbl></div>
+      <div style={{gridColumn:"1/-1"}}><Lbl label={t.jobTitle+" (ລາວ)"}><input value={f.title_lao||""} onChange={e=>set("title_lao",e.target.value)} style={IS()}/></Lbl></div>
+      <div style={{gridColumn:"1/-1"}}><Lbl label={t.desc}><textarea value={f.description||""} onChange={e=>set("description",e.target.value)} style={{...IS(),height:50,resize:"vertical"}}/></Lbl></div>
+      <Lbl label={t.category}><select value={f.category||""} onChange={e=>set("category",e.target.value)} style={IS()}>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select></Lbl>
+      <Lbl label={t.priority}><select value={f.priority} onChange={e=>set("priority",e.target.value)} style={IS()}>{Object.entries(PRIORITY).map(([k,v])=><option key={k} value={k}>{v[lang]||v.en}</option>)}</select></Lbl>
+      <Lbl label={t.project}><select value={f.project_id||""} onChange={e=>set("project_id",e.target.value)} style={IS()}><option value="">-- None --</option>{projects.map(p=><option key={p.id} value={p.id}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</option>)}</select></Lbl>
+      <Lbl label={t.estHrs}><input type="number" min="1" value={f.estimated_hours||8} onChange={e=>set("estimated_hours",+e.target.value)} style={IS()}/></Lbl>
+      {user.role==="leader"&&<div style={{gridColumn:"1/-1"}}><Lbl label={t.assignee+" (default)"}><select value={f.default_assignee_id||user.id} onChange={e=>set("default_assignee_id",e.target.value)} style={IS()}>{users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Lbl></div>}
 
       {/* ── SCHEDULE SECTION ── */}
-      <div style={{gridColumn:"1/-1",borderTop:"1px solid #f1f5f9",paddingTop:14,marginTop:4}}>
-        <div style={{fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:0.5,marginBottom:12}}>⏰ {lang==="lo"?"ຕາຕະລາງ / ຄວາມຖີ່":"Schedule / Frequency"}</div>
+      <div style={{gridColumn:"1/-1",borderTop:`1px solid ${DK.bdr3()}`,paddingTop:14,marginTop:4}}>
+        <div style={{fontSize:11,fontWeight:700,color:DK.txt3(),textTransform:"uppercase",letterSpacing:0.5,marginBottom:12}}>⏰ {lang==="lo"?"ຕາຕະລາງ / ຄວາມຖີ່":"Schedule / Frequency"}</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
 
           {/* Schedule type */}
@@ -1066,37 +1121,37 @@ function TemplateModal({initial,onClose,onSave,user,users,projects,lang}){
               if(v==="every_n_days")set("schedule_day",14);
               if(v==="monthly"){set("due_offset",10);set("anchor_date","");}
               if(v!=="monthly")set("due_offset",1);
-            }} style={IS}>
+            }} style={IS()}>
               {Object.entries(scheduleLabel).map(([k,l])=><option key={k} value={k}>{l}</option>)}
             </select>
           </Lbl>
 
           {/* Day of week (weekly / biweekly) */}
           {(f.schedule==="weekly"||f.schedule==="biweekly")&&<Lbl label={lang==="lo"?"ວັນໃນອາທິດ":"Day of Week"}>
-            <select value={Number(f.schedule_day)} onChange={e=>set("schedule_day",+e.target.value)} style={IS}>
+            <select value={Number(f.schedule_day)} onChange={e=>set("schedule_day",+e.target.value)} style={IS()}>
               {DAYS_EN.map((d,i)=><option key={i} value={i}>{lang==="lo"?DAYS_LO[i]:d}</option>)}
             </select>
           </Lbl>}
 
           {/* Every N days interval */}
           {f.schedule==="every_n_days"&&<Lbl label={lang==="lo"?"ທຸກກີ່ວັນ":"Every N Days"}>
-            <input type="number" min="1" max="30" value={Number(f.schedule_day)||14} onChange={e=>set("schedule_day",+e.target.value)} style={IS}/>
+            <input type="number" min="1" max="30" value={Number(f.schedule_day)||14} onChange={e=>set("schedule_day",+e.target.value)} style={IS()}/>
           </Lbl>}
 
           {/* Due offset */}
           {f.schedule==="monthly"&&<Lbl label={lang==="lo"?"ຄົບກໍານົດ (ວັນທີ 1 + N)":"Due Offset from 1st (days)"}>
-            <input type="number" min="0" max="30" value={Number(f.due_offset)||10} onChange={e=>set("due_offset",+e.target.value)} style={IS}/>
+            <input type="number" min="0" max="30" value={Number(f.due_offset)||10} onChange={e=>set("due_offset",+e.target.value)} style={IS()}/>
           </Lbl>}
           {f.schedule!=="monthly"&&<Lbl label={lang==="lo"?"ຄົບກໍານົດ ຫຼັງ N ວັນ (T+N)":"Due Date: T + N days"}>
-            <input type="number" min="0" max="14" value={Number(f.due_offset)||1} onChange={e=>set("due_offset",+e.target.value)} style={IS}/>
+            <input type="number" min="0" max="14" value={Number(f.due_offset)||1} onChange={e=>set("due_offset",+e.target.value)} style={IS()}/>
           </Lbl>}
 
           {/* ── ANCHOR DATE — critical for weekly/biweekly/every_n_days ── */}
           {f.schedule!=="monthly"&&<div style={{gridColumn:"1/-1"}}>
             <Lbl label={lang==="lo"?"ວັນທີ່ທຳອິດ (Anchor Date) *ສຳຄັນ":"First Occurrence Date (Anchor) *Required"}>
-              <input type="date" value={f.anchor_date||""} onChange={e=>set("anchor_date",e.target.value)} style={IS}/>
+              <input type="date" value={f.anchor_date||""} onChange={e=>set("anchor_date",e.target.value)} style={IS()}/>
             </Lbl>
-            <div style={{fontSize:11,color:"#64748b",marginTop:-8,marginBottom:4,padding:"6px 10px",background:"#fefce8",borderRadius:6,border:"1px solid #fde68a",lineHeight:1.6}}>
+            <div style={{fontSize:11,color:DK.txt4(),marginTop:-8,marginBottom:4,padding:"6px 10px",background:"#fefce8",borderRadius:6,border:"1px solid #fde68a",lineHeight:1.6}}>
               ⚠️ <strong>{lang==="lo"?"ຕ້ອງລະບຸ:":"Must set:"}</strong> {lang==="lo"
                 ?"ເລືອກວັນທີ່ທີ່ວຽກນີ້ຈະເຮັດຄັ້ງທໍາອິດ ຈາກນັ້ນລະບົບຈະຄຳນວນ interval ໂດຍອໍາໂນມັດ (ຖ້າຕ້ອງການທຸກ 14 ວັນ ໃສ່ວັນພະຫັດຄັ້ງທໍາອິດ)"
                 :"Pick the exact date this job first runs. The system counts forward by the interval from there — ensuring correct weeks every month. Example: first Thursday = Apr 3, 2025 → every 14 days from that date."}
@@ -1113,14 +1168,14 @@ function TemplateModal({initial,onClose,onSave,user,users,projects,lang}){
           {previewDates.length>0
             ?<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {previewDates.map((d,i)=>(
-                <div key={i} style={{background:"#fff",borderRadius:6,padding:"6px 12px",border:"1px solid #bfdbfe",fontSize:12,lineHeight:1.5}}>
+                <div key={i} style={{background:DK.bg(),borderRadius:6,padding:"6px 12px",border:"1px solid #bfdbfe",fontSize:12,lineHeight:1.5}}>
                   <div style={{fontWeight:700,color:"#1d4ed8",fontSize:10,marginBottom:1}}>Occurrence #{i+1}</div>
-                  <div style={{color:"#374151"}}>▶ {d.start}</div>
-                  <div style={{color:"#64748b"}}>✓ Due {d.due}</div>
+                  <div style={{color:DK.txt3()}}>▶ {d.start}</div>
+                  <div style={{color:DK.txt4()}}>✓ Due {d.due}</div>
                 </div>
               ))}
             </div>
-            :<div style={{color:"#94a3b8",fontSize:12}}>
+            :<div style={{color:DK.txt5(),fontSize:12}}>
               {f.schedule==="monthly"?"1 job on the 1st of the month":f.anchor_date?"No occurrences fall in this month with that anchor":"Set an anchor date to see the preview"}
             </div>
           }
@@ -1154,17 +1209,17 @@ function PendingPage({pending,user,getUser,onApprove,onReject,lang}){
   const [rejectId,setRejectId]=useState(null);const [reason,setReason]=useState("");
   const waiting=pending.filter(j=>!j.approval_status||j.approval_status==="pending");
   return <div style={{animation:"fadeUp 0.3s ease"}}>
-    <div style={{background:"#fff",borderRadius:12,padding:16,marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}><div style={{fontSize:16,fontWeight:700,color:"#0f172a",marginBottom:2}}>📥 {lang==="lo"?"ລໍຄໍາອະນຸມັດ":"Pending Approvals"}</div><div style={{color:"#64748b",fontSize:13}}>{t.pendingDesc}</div></div>
-    {waiting.length===0&&<div style={{background:"#fff",borderRadius:12,padding:40,textAlign:"center",color:"#94a3b8",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>✅ {lang==="lo"?"ບໍ່ມີຄໍາຂໍ":"No pending requests"}</div>}
-    {waiting.map(j=><div key={j.id} style={{background:"#fff",borderRadius:12,padding:18,marginBottom:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderLeft:"4px solid #f59e0b"}}>
+    <div style={{background:DK.bg(),borderRadius:12,padding:16,marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}><div style={{fontSize:16,fontWeight:700,color:DK.txt(),marginBottom:2}}>📥 {lang==="lo"?"ລໍຄໍາອະນຸມັດ":"Pending Approvals"}</div><div style={{color:DK.txt4(),fontSize:13}}>{t.pendingDesc}</div></div>
+    {waiting.length===0&&<div style={{background:DK.bg(),borderRadius:12,padding:40,textAlign:"center",color:DK.txt5(),boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>✅ {lang==="lo"?"ບໍ່ມີຄໍາຂໍ":"No pending requests"}</div>}
+    {waiting.map(j=><div key={j.id} style={{background:DK.bg(),borderRadius:12,padding:18,marginBottom:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderLeft:"4px solid #f59e0b"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
-        <div style={{flex:1}}><div style={{fontWeight:700,color:"#0f172a",fontSize:15}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div><div style={{color:"#64748b",fontSize:13,marginTop:3}}>{j.description}</div><div style={{display:"flex",gap:14,marginTop:8,flexWrap:"wrap"}}><span style={{fontSize:12,color:"#64748b"}}>📁 {j.category}</span><span style={{fontSize:12,color:"#64748b"}}>📅 {j.due_date}</span><PriDot priority={j.priority} lang={lang}/><span style={{fontSize:12,color:"#64748b"}}>By: <strong>{getUser(j.requested_by)?.name||j.requested_by}</strong></span></div></div>
+        <div style={{flex:1}}><div style={{fontWeight:700,color:DK.txt(),fontSize:15}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div><div style={{color:DK.txt4(),fontSize:13,marginTop:3}}>{j.description}</div><div style={{display:"flex",gap:14,marginTop:8,flexWrap:"wrap"}}><span style={{fontSize:12,color:DK.txt4()}}>📁 {j.category}</span><span style={{fontSize:12,color:DK.txt4()}}>📅 {j.due_date}</span><PriDot priority={j.priority} lang={lang}/><span style={{fontSize:12,color:DK.txt4()}}>By: <strong>{getUser(j.requested_by)?.name||j.requested_by}</strong></span></div></div>
         {user.role==="leader"&&<div style={{display:"flex",gap:8}}><button onClick={()=>onApprove(j.id)} style={{...BS("#16a34a"),padding:"8px 16px"}}>✓ {t.approve}</button><button onClick={()=>{setRejectId(j.id);setReason("");}} style={{...BS("#dc2626"),padding:"8px 16px"}}>✕ {t.reject}</button></div>}
         {user.role==="runner"&&<span style={{padding:"4px 12px",borderRadius:99,background:"#fef3c7",color:"#92400e",fontSize:12,fontWeight:700}}>⏳ Waiting</span>}
       </div>
     </div>)}
-    {pending.filter(j=>j.approval_status&&j.approval_status!=="pending").length>0&&<><div style={{fontSize:14,fontWeight:700,color:"#64748b",margin:"18px 0 8px"}}>Past Requests</div>{pending.filter(j=>j.approval_status&&j.approval_status!=="pending").map(j=><div key={j.id} style={{background:"#fff",borderRadius:10,padding:12,marginBottom:6,boxShadow:"0 1px 3px rgba(0,0,0,0.04)",opacity:0.75,borderLeft:`4px solid ${j.approval_status==="approved"?"#16a34a":"#dc2626"}`}}><div style={{display:"flex",justifyContent:"space-between"}}><div style={{fontWeight:600,color:"#374151"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div><span style={{fontSize:12,padding:"2px 10px",borderRadius:99,background:j.approval_status==="approved"?"#f0fdf4":"#fef2f2",color:j.approval_status==="approved"?"#16a34a":"#dc2626",fontWeight:700}}>{j.approval_status}</span></div>{j.reject_reason&&<div style={{fontSize:12,color:"#dc2626",marginTop:3}}>{j.reject_reason}</div>}</div>)}</>}
-    {rejectId&&<Modal title="Reject Request" onClose={()=>setRejectId(null)} onSave={()=>{onReject(rejectId,reason);setRejectId(null);}} saveLabel="Reject" saveColor="#dc2626"><Lbl label="Reason"><textarea value={reason} onChange={e=>setReason(e.target.value)} style={{...IS,height:80}} placeholder="Reason for rejection..."/></Lbl></Modal>}
+    {pending.filter(j=>j.approval_status&&j.approval_status!=="pending").length>0&&<><div style={{fontSize:14,fontWeight:700,color:DK.txt4(),margin:"18px 0 8px"}}>Past Requests</div>{pending.filter(j=>j.approval_status&&j.approval_status!=="pending").map(j=><div key={j.id} style={{background:DK.bg(),borderRadius:10,padding:12,marginBottom:6,boxShadow:"0 1px 3px rgba(0,0,0,0.04)",opacity:0.75,borderLeft:`4px solid ${j.approval_status==="approved"?"#16a34a":"#dc2626"}`}}><div style={{display:"flex",justifyContent:"space-between"}}><div style={{fontWeight:600,color:DK.txt3()}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div><span style={{fontSize:12,padding:"2px 10px",borderRadius:99,background:j.approval_status==="approved"?"#f0fdf4":"#fef2f2",color:j.approval_status==="approved"?"#16a34a":"#dc2626",fontWeight:700}}>{j.approval_status}</span></div>{j.reject_reason&&<div style={{fontSize:12,color:"#dc2626",marginTop:3}}>{j.reject_reason}</div>}</div>)}</>}
+    {rejectId&&<Modal title="Reject Request" onClose={()=>setRejectId(null)} onSave={()=>{onReject(rejectId,reason);setRejectId(null);}} saveLabel="Reject" saveColor="#dc2626"><Lbl label="Reason"><textarea value={reason} onChange={e=>setReason(e.target.value)} style={{...IS(),height:80}} placeholder="Reason for rejection..."/></Lbl></Modal>}
   </div>;
 }
 
@@ -1362,23 +1417,23 @@ function TimelinePage({projects,jobs,getUser,users,lang}){
 
   return <div style={{animation:"fadeUp 0.3s ease"}}>
     {/* Controls — single compact row */}
-    <div style={{background:"#fff",borderRadius:12,padding:"10px 14px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",gap:8,alignItems:"center",flexWrap:"nowrap",overflowX:"auto"}}>
-      <div style={{fontWeight:700,color:"#0f172a",fontSize:14,flexShrink:0}}>📊 {lang==="lo"?"ເສັ້ນທາງ":"Timeline"}</div>
-      <select value={selProj} onChange={e=>setSelProj(e.target.value)} style={{...SS,minWidth:130,maxWidth:160,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+    <div style={{background:DK.bg(),borderRadius:12,padding:"10px 14px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",gap:8,alignItems:"center",flexWrap:"nowrap",overflowX:"auto"}}>
+      <div style={{fontWeight:700,color:DK.txt(),fontSize:14,flexShrink:0}}>📊 {lang==="lo"?"ເສັ້ນທາງ":"Timeline"}</div>
+      <select value={selProj} onChange={e=>setSelProj(e.target.value)} style={{...SS(),minWidth:130,maxWidth:160,borderRadius:8,border:`1px solid ${DK.bdr()}`,fontSize:12}}>
         <option value="all">{t.allProjects}</option>
         {projects.map(p=><option key={p.id} value={p.id}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</option>)}
       </select>
-      <select value={fUser} onChange={e=>setFUser(e.target.value)} style={{...SS,minWidth:110,maxWidth:140,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+      <select value={fUser} onChange={e=>setFUser(e.target.value)} style={{...SS(),minWidth:110,maxWidth:140,borderRadius:8,border:`1px solid ${DK.bdr()}`,fontSize:12}}>
         <option value="all">{lang==="lo"?"ທຸກຄົນ":"All Staff"}</option>
         {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
       </select>
       {/* Compact legend dots */}
       <div style={{display:"flex",gap:8,flexShrink:0}}>
-        {Object.entries(sc).map(([k,c])=><span key={k} style={{display:"flex",alignItems:"center",gap:3,fontSize:10,color:"#64748b",whiteSpace:"nowrap"}}>
+        {Object.entries(sc).map(([k,c])=><span key={k} style={{display:"flex",alignItems:"center",gap:3,fontSize:10,color:DK.txt4(),whiteSpace:"nowrap"}}>
           <span style={{width:10,height:10,borderRadius:2,background:c,display:"inline-block",flexShrink:0}}/>
           {k}
         </span>)}
-        <span style={{display:"flex",alignItems:"center",gap:3,fontSize:10,color:"#64748b",whiteSpace:"nowrap"}}>
+        <span style={{display:"flex",alignItems:"center",gap:3,fontSize:10,color:DK.txt4(),whiteSpace:"nowrap"}}>
           <span style={{width:2,height:10,background:"#ef4444",display:"inline-block"}}/>Today
         </span>
       </div>
@@ -1386,15 +1441,15 @@ function TimelinePage({projects,jobs,getUser,users,lang}){
     </div>
 
     {/* Timeline chart */}
-    <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden",position:"relative"}}>
+    <div style={{background:DK.bg(),borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden",position:"relative"}}>
       {/* Scrollable container */}
       <div style={{overflowX:"auto"}}>
         <div style={{minWidth:800,position:"relative"}}>
 
           {/* RULER HEADER */}
-          <div style={{display:"flex",borderBottom:"2px solid #e8edf5",background:"#f8fafc",position:"sticky",top:0,zIndex:10}}>
+          <div style={{display:"flex",borderBottom:"2px solid #e8edf5",background:DK.bg2(),position:"sticky",top:0,zIndex:10}}>
             {/* Label column */}
-            <div style={{width:LABEL_W,flexShrink:0,padding:"8px 14px",fontSize:11,fontWeight:700,color:"#94a3b8",borderRight:"1px solid #e8edf5"}}>
+            <div style={{width:LABEL_W,flexShrink:0,padding:"8px 14px",fontSize:11,fontWeight:700,color:DK.txt5(),borderRight:"1px solid #e8edf5"}}>
               {lang==="lo"?"ໂຄງການ / ວຽກ":"Project / Job"}
             </div>
             {/* Tick marks */}
@@ -1434,12 +1489,12 @@ function TimelinePage({projects,jobs,getUser,users,lang}){
 
             return <div key={p.id}>
               {/* PROJECT ROW */}
-              <div style={{display:"flex",alignItems:"stretch",borderBottom:"1px solid #e8edf5",background:"#f4f6fb"}}>
+              <div style={{display:"flex",alignItems:"stretch",borderBottom:`1px solid ${DK.bdr2()}`,background:"#f4f6fb"}}>
                 <div style={{width:LABEL_W,flexShrink:0,padding:"10px 14px",borderRight:"1px solid #e8edf5",borderLeft:`4px solid ${projColor}`}}>
-                  <div style={{fontWeight:700,color:"#0f172a",fontSize:13}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div>
+                  <div style={{fontWeight:700,color:DK.txt(),fontSize:13}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div>
                   <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}>
                     <span style={{fontSize:10,padding:"1px 6px",borderRadius:99,background:projColor+"22",color:projColor,fontWeight:700,textTransform:"capitalize"}}>{p.status}</span>
-                    <span style={{fontSize:10,color:"#94a3b8"}}>{dn}/{pJobs.length} · {projPct}%</span>
+                    <span style={{fontSize:10,color:DK.txt5()}}>{dn}/{pJobs.length} · {projPct}%</span>
                   </div>
                 </div>
                 {/* Project Gantt bar */}
@@ -1471,7 +1526,7 @@ function TimelinePage({projects,jobs,getUser,users,lang}){
                 const pg=Number(j.progress)||0;
                 const dueX=toX(j.due_date);
 
-                return <div key={j.id} style={{display:"flex",alignItems:"stretch",borderBottom:"1px solid #f1f5f9",background:j.status==="done"?"#fafffe":"#fff",opacity:j.status==="done"?0.7:1}}>
+                return <div key={j.id} style={{display:"flex",alignItems:"stretch",borderBottom:`1px solid ${DK.bdr3()}`,background:j.status==="done"?"#fafffe":"#fff",opacity:j.status==="done"?0.7:1}}>
                   {/* Label */}
                   <div style={{width:LABEL_W,flexShrink:0,padding:"7px 10px 7px 22px",borderRight:"1px solid #f1f5f9"}}>
                     <div style={{fontSize:12,color:j.status==="done"?"#94a3b8":"#374151",fontWeight:500,lineHeight:1.3}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
@@ -1513,7 +1568,7 @@ function TimelinePage({projects,jobs,getUser,users,lang}){
             </div>;
           })}
 
-          {visibleProjects.length===0&&<div style={{textAlign:"center",padding:40,color:"#94a3b8"}}>{t.noJobs}</div>}
+          {visibleProjects.length===0&&<div style={{textAlign:"center",padding:40,color:DK.txt5()}}>{t.noJobs}</div>}
         </div>
       </div>
     </div>
@@ -1556,12 +1611,12 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
 
   // Stat card component
   const StatCard=({label,value,sub,color="#2563eb",icon})=>(
-    <div style={{background:"#fff",borderRadius:12,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`3px solid ${color}`}}>
+    <div style={{background:DK.bg(),borderRadius:12,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`3px solid ${color}`}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
         <div>
-          <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.4,marginBottom:3}}>{label}</div>
-          <div style={{fontSize:28,fontWeight:800,color:"#0f172a"}}>{value}</div>
-          {sub&&<div style={{fontSize:11,color:"#64748b",marginTop:3}}>{sub}</div>}
+          <div style={{fontSize:11,fontWeight:700,color:DK.txt5(),textTransform:"uppercase",letterSpacing:0.4,marginBottom:3}}>{label}</div>
+          <div style={{fontSize:28,fontWeight:800,color:DK.txt()}}>{value}</div>
+          {sub&&<div style={{fontSize:11,color:DK.txt4(),marginTop:3}}>{sub}</div>}
         </div>
         <div style={{width:38,height:38,borderRadius:10,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color}}>{icon}</div>
       </div>
@@ -1574,9 +1629,9 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
     return <div style={{display:"flex",alignItems:"flex-end",gap:3,height,paddingTop:4}}>
       {data.map((d,i)=>(
         <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-          <div style={{fontSize:9,color:"#94a3b8",fontWeight:600}}>{d.v||""}</div>
+          <div style={{fontSize:9,color:DK.txt5(),fontWeight:600}}>{d.v||""}</div>
           <div style={{width:"100%",background:color,borderRadius:"3px 3px 0 0",height:`${Math.max(4,Math.round(d.v/max*(height-20)))}px`,transition:"height 0.4s ease"}}/>
-          <div style={{fontSize:9,color:"#94a3b8",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%",textAlign:"center"}}>{d.l}</div>
+          <div style={{fontSize:9,color:DK.txt5(),whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%",textAlign:"center"}}>{d.l}</div>
         </div>
       ))}
     </div>;
@@ -1686,7 +1741,7 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
 
     return <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-        <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{lang==="lo"?"ລາຍງານສ່ວນຕົວ":"Personal Performance"} — {user.name}</div>
+        <div style={{fontSize:15,fontWeight:700,color:DK.txt()}}>{lang==="lo"?"ລາຍງານສ່ວນຕົວ":"Personal Performance"} — {user.name}</div>
         <button onClick={printReport} style={{...BS("#dc2626"),padding:"7px 16px",fontSize:13}}>↓ PDF</button>
       </div>
       {/* KPI Cards */}
@@ -1701,30 +1756,30 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 240px",gap:16,marginBottom:16}}>
         {/* Jobs by category bar */}
-        <div style={{background:"#fff",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:12}}>📁 {lang==="lo"?"ວຽກຕາມປະເພດ":"Jobs by Category"}</div>
-          {catData.length?<BarChart data={catData} color="#3b82f6" height={100}/>:<div style={{color:"#94a3b8",fontSize:12,textAlign:"center",padding:20}}>No data</div>}
+        <div style={{background:DK.bg(),borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:DK.txt(),marginBottom:12}}>📁 {lang==="lo"?"ວຽກຕາມປະເພດ":"Jobs by Category"}</div>
+          {catData.length?<BarChart data={catData} color="#3b82f6" height={100}/>:<div style={{color:DK.txt5(),fontSize:12,textAlign:"center",padding:20}}>No data</div>}
         </div>
         {/* Status breakdown */}
-        <div style={{background:"#fff",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:12}}>📊 {lang==="lo"?"ສະຖານະ":"Status Breakdown"}</div>
+        <div style={{background:DK.bg(),borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:DK.txt(),marginBottom:12}}>📊 {lang==="lo"?"ສະຖານະ":"Status Breakdown"}</div>
           <div style={{display:"flex",alignItems:"center",gap:16}}>
             <Donut segments={Object.entries(STATUS).map(([k,v])=>({v:my.filter(j=>j.status===k).length,c:v.c}))} size={80}/>
             <div style={{flex:1}}>
               {Object.entries(STATUS).map(([k,v])=>{const n=my.filter(j=>j.status===k).length;return n>0&&<div key={k} style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
                 <div style={{width:10,height:10,borderRadius:2,background:v.c,flexShrink:0}}/>
-                <span style={{fontSize:12,color:"#374151",flex:1}}>{v[lang]||v.en}</span>
+                <span style={{fontSize:12,color:DK.txt3(),flex:1}}>{v[lang]||v.en}</span>
                 <span style={{fontSize:12,fontWeight:700,color:v.c}}>{n}</span>
               </div>;})}
             </div>
           </div>
         </div>
         {/* Priority donut */}
-        <div style={{background:"#fff",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:12}}>🎯 {lang==="lo"?"ລະດັບ":"Priority"}</div>
+        <div style={{background:DK.bg(),borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:DK.txt(),marginBottom:12}}>🎯 {lang==="lo"?"ລະດັບ":"Priority"}</div>
           <Donut segments={priBreak} size={70}/>
           <div style={{marginTop:6}}>
-            {priBreak.filter(p=>p.v>0).map(p=><div key={p.l} style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#64748b",marginBottom:2}}>
+            {priBreak.filter(p=>p.v>0).map(p=><div key={p.l} style={{display:"flex",justifyContent:"space-between",fontSize:11,color:DK.txt4(),marginBottom:2}}>
               <span>{p.l}</span><span style={{fontWeight:700,color:p.c}}>{p.v}</span>
             </div>)}
           </div>
@@ -1735,27 +1790,27 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
       {(overdue.length>0||blocked.length>0)&&<div style={{background:"#fef2f2",borderRadius:12,padding:16,marginBottom:16,border:"1px solid #fecaca"}}>
         <div style={{fontSize:13,fontWeight:700,color:"#dc2626",marginBottom:8}}>⚠ {lang==="lo"?"ຕ້ອງການຄວາມສົນໃຈ":"Needs Attention"} ({overdue.length+blocked.length})</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          {[...overdue,...blocked].map(j=><div key={j.id} style={{background:"#fff",borderRadius:8,padding:"7px 12px",border:"1px solid #fca5a5",fontSize:12}}>
-            <span style={{fontWeight:600,color:"#1e293b"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</span>
+          {[...overdue,...blocked].map(j=><div key={j.id} style={{background:DK.bg(),borderRadius:8,padding:"7px 12px",border:"1px solid #fca5a5",fontSize:12}}>
+            <span style={{fontWeight:600,color:DK.txt2()}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</span>
             <span style={{marginLeft:6,fontSize:11,color:"#dc2626"}}>{j.status==="blocked"?"Blocked":"⚠ "+cleanDate(j.due_date)}</span>
           </div>)}
         </div>
       </div>}
 
       {/* Job list - grouped by project, no hours, show notes */}
-      <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
-        <div style={{padding:"12px 16px",borderBottom:"1px solid #f1f5f9",fontSize:13,fontWeight:700,color:"#0f172a"}}>{lang==="lo"?"ລາຍລະອຽດວຽກ":"Job Details"} ({my.length})</div>
+      <div style={{background:DK.bg(),borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+        <div style={{padding:"12px 16px",borderBottom:`1px solid ${DK.bdr3()}`,fontSize:13,fontWeight:700,color:DK.txt()}}>{lang==="lo"?"ລາຍລະອຽດວຽກ":"Job Details"} ({my.length})</div>
         {Object.entries(my.reduce((acc,j)=>{const k=j.project_id||"__none__";if(!acc[k])acc[k]=[];acc[k].push(j);return acc;},{})).map(([pid,pjobs])=>{
           const pname=projects.find(p=>p.id===pid)?.name||(lang==="lo"?"ບໍ່ມີໂຄງການ":"No Project");
           return <div key={pid}>
-            <div style={{padding:"8px 16px",background:"#f0f4f8",borderBottom:"1px solid #e8edf5",fontSize:12,fontWeight:700,color:"#374151"}}>📂 {pname}</div>
+            <div style={{padding:"8px 16px",background:DK.bg3(),borderBottom:`1px solid ${DK.bdr2()}`,fontSize:12,fontWeight:700,color:DK.txt3()}}>📂 {pname}</div>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-              <thead><tr style={{background:"#f8fafc"}}>{["Job / Notes","Category","Status","Priority","Due","%"].map(h=><th key={h} style={{textAlign:"left",padding:"8px 12px",color:"#64748b",fontWeight:700,fontSize:10,textTransform:"uppercase",borderBottom:"1px solid #e8edf5"}}>{h}</th>)}</tr></thead>
+              <thead><tr style={{background:DK.bg2()}}>{["Job / Notes","Category","Status","Priority","Due","%"].map(h=><th key={h} style={{textAlign:"left",padding:"8px 12px",color:DK.txt4(),fontWeight:700,fontSize:10,textTransform:"uppercase",borderBottom:`1px solid ${DK.bdr2()}`}}>{h}</th>)}</tr></thead>
               <tbody>
                 {pjobs.sort((a,b)=>(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>{const od=new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done";const pg=Number(j.progress)||0;
                 return <tr key={j.id} style={{borderBottom:"1px solid #f8fafc"}} onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"} onMouseLeave={e=>e.currentTarget.style.background=""}>
                   <td style={{padding:"9px 12px",maxWidth:260}}>
-                    <div style={{fontWeight:600,color:"#1e293b"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+                    <div style={{fontWeight:600,color:DK.txt2()}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
                     {j.notes&&<RenderNotesJSX raw={j.notes} compact/>}
                   </td>
                   <td style={{padding:"9px 12px"}}><span style={{fontSize:10,padding:"1px 7px",borderRadius:99,background:"#f0f9ff",color:"#0369a1",fontWeight:600}}>{j.category||"—"}</span></td>
@@ -1764,8 +1819,8 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
                   <td style={{padding:"9px 12px",color:od?"#dc2626":"#64748b",fontSize:11,fontWeight:od?700:400,whiteSpace:"nowrap"}}>{od?"⚠ ":""}{cleanDate(j.due_date)}</td>
                   <td style={{padding:"9px 12px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <div style={{width:50,height:4,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":"#3b82f6",borderRadius:99}}/></div>
-                      <span style={{fontSize:11,color:"#64748b"}}>{pg}%</span>
+                      <div style={{width:50,height:4,background:DK.bg3(),borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":"#3b82f6",borderRadius:99}}/></div>
+                      <span style={{fontSize:11,color:DK.txt4()}}>{pg}%</span>
                     </div>
                   </td>
                 </tr>;})}
@@ -1842,10 +1897,10 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
 
     return <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
-        <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{lang==="lo"?"ລາຍງານທີມ":"Team Performance Report"}</div>
+        <div style={{fontSize:15,fontWeight:700,color:DK.txt()}}>{lang==="lo"?"ລາຍງານທີມ":"Team Performance Report"}</div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <select value={fTeamUser} onChange={e=>setFTeamUser(e.target.value)}
-            style={{...SS,minWidth:140,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+            style={{...SS(),minWidth:140,borderRadius:8,border:`1px solid ${DK.bdr()}`,fontSize:12}}>
             <option value="all">{lang==="lo"?"ທຸກຄົນ":"All Staff"}</option>
             {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
@@ -1863,19 +1918,19 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
         {/* Staff performance table */}
-        <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
-          <div style={{padding:"12px 16px",borderBottom:"1px solid #f1f5f9",fontSize:13,fontWeight:700,color:"#0f172a"}}>👤 {lang==="lo"?"ປະສິດທິພາບ":"Staff"}</div>
+        <div style={{background:DK.bg(),borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+          <div style={{padding:"12px 16px",borderBottom:`1px solid ${DK.bdr3()}`,fontSize:13,fontWeight:700,color:DK.txt()}}>👤 {lang==="lo"?"ປະສິດທິພາບ":"Staff"}</div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr style={{background:"#f8fafc"}}>{["Name","Total","Done","%","OD"].map(h=><th key={h} style={{textAlign:"left",padding:"8px 12px",color:"#64748b",fontWeight:700,fontSize:10,textTransform:"uppercase",borderBottom:"1px solid #e8edf5"}}>{h}</th>)}</tr></thead>
+            <thead><tr style={{background:DK.bg2()}}>{["Name","Total","Done","%","OD"].map(h=><th key={h} style={{textAlign:"left",padding:"8px 12px",color:DK.txt4(),fontWeight:700,fontSize:10,textTransform:"uppercase",borderBottom:`1px solid ${DK.bdr2()}`}}>{h}</th>)}</tr></thead>
             <tbody>
               {staffStats.map(s=><tr key={s.u.id} style={{borderBottom:"1px solid #f8fafc"}}>
                 <td style={{padding:"9px 12px"}}><Avtr user={s.u} size={22} showName/></td>
-                <td style={{padding:"9px 12px",fontWeight:600,color:"#1e293b"}}>{s.total}</td>
+                <td style={{padding:"9px 12px",fontWeight:600,color:DK.txt2()}}>{s.total}</td>
                 <td style={{padding:"9px 12px",color:"#16a34a",fontWeight:600}}>{s.done}</td>
                 <td style={{padding:"9px 12px"}}>
                   <div style={{display:"flex",alignItems:"center",gap:4}}>
-                    <div style={{width:40,height:4,background:"#f1f5f9",borderRadius:99}}><div style={{height:"100%",width:`${s.compRate}%`,background:s.compRate>=80?"#16a34a":s.compRate>=50?"#f59e0b":"#dc2626",borderRadius:99}}/></div>
-                    <span style={{fontSize:11,color:"#64748b"}}>{s.compRate}%</span>
+                    <div style={{width:40,height:4,background:DK.bg3(),borderRadius:99}}><div style={{height:"100%",width:`${s.compRate}%`,background:s.compRate>=80?"#16a34a":s.compRate>=50?"#f59e0b":"#dc2626",borderRadius:99}}/></div>
+                    <span style={{fontSize:11,color:DK.txt4()}}>{s.compRate}%</span>
                   </div>
                 </td>
                 <td style={{padding:"9px 12px",color:s.overdue>0?"#dc2626":"#94a3b8",fontWeight:s.overdue>0?700:400}}>{s.overdue||"—"}</td>
@@ -1884,26 +1939,26 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
           </table>
         </div>
         {/* Project progress */}
-        <div style={{background:"#fff",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:14}}>📂 {lang==="lo"?"ຄວາມຄືບໜ້າໂຄງການ":"Project Progress"}</div>
+        <div style={{background:DK.bg(),borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:DK.txt(),marginBottom:14}}>📂 {lang==="lo"?"ຄວາມຄືບໜ້າໂຄງການ":"Project Progress"}</div>
           {projStats.map(s=>{const sc2={active:"#2563eb",planning:"#7c3aed",completed:"#16a34a",paused:"#f59e0b"};return <div key={s.p.id} style={{marginBottom:14}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-              <div style={{fontWeight:600,color:"#1e293b",fontSize:12}}>{s.p.name}</div>
-              <div style={{fontSize:11,color:"#64748b"}}>{s.done}/{s.total} · {s.pct}%</div>
+              <div style={{fontWeight:600,color:DK.txt2(),fontSize:12}}>{s.p.name}</div>
+              <div style={{fontSize:11,color:DK.txt4()}}>{s.done}/{s.total} · {s.pct}%</div>
             </div>
-            <div style={{height:6,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${s.pct}%`,background:sc2[s.p.status]||"#3b82f6",borderRadius:99,transition:"width 0.6s"}}/></div>
+            <div style={{height:6,background:DK.bg3(),borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${s.pct}%`,background:sc2[s.p.status]||"#3b82f6",borderRadius:99,transition:"width 0.6s"}}/></div>
           </div>;})}
         </div>
       </div>
 
       {/* Category heatmap */}
-      <div style={{background:"#fff",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:14}}>🔥 {lang==="lo"?"ໂຖໂດຍໝວດ":"Workload by Category"}</div>
+      <div style={{background:DK.bg(),borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+        <div style={{fontSize:13,fontWeight:700,color:DK.txt(),marginBottom:14}}>🔥 {lang==="lo"?"ໂຖໂດຍໝວດ":"Workload by Category"}</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
           {catArr.map(([cat,data])=>{const cr=pct(data.done,data.total);const heat=cr>=80?"#dcfce7":cr>=50?"#fef3c7":"#fee2e2";
           return <div key={cat} style={{background:heat,borderRadius:8,padding:"10px 12px",border:`1px solid ${cr>=80?"#bbf7d0":cr>=50?"#fde68a":"#fecaca"}`}}>
-            <div style={{fontSize:12,fontWeight:700,color:"#1e293b",marginBottom:3}}>{cat}</div>
-            <div style={{fontSize:11,color:"#64748b"}}>{data.done}/{data.total} · {cr}%</div>
+            <div style={{fontSize:12,fontWeight:700,color:DK.txt2(),marginBottom:3}}>{cat}</div>
+            <div style={{fontSize:11,color:DK.txt4()}}>{data.done}/{data.total} · {cr}%</div>
           </div>;})}
         </div>
       </div>
@@ -1945,21 +2000,21 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
       `);
     };
 
-    const RiskTable=({title,items,emptyMsg,color="#dc2626"})=><div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden",marginBottom:14}}>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{title}</div>
+    const RiskTable=({title,items,emptyMsg,color="#dc2626"})=><div style={{background:DK.bg(),borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden",marginBottom:14}}>
+      <div style={{padding:"12px 16px",borderBottom:`1px solid ${DK.bdr3()}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontSize:13,fontWeight:700,color:DK.txt()}}>{title}</div>
         <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,background:color+"18",color,fontWeight:700}}>{items.length}</span>
       </div>
-      {items.length===0?<div style={{padding:20,textAlign:"center",color:"#94a3b8",fontSize:12}}>✅ {emptyMsg}</div>:
+      {items.length===0?<div style={{padding:20,textAlign:"center",color:DK.txt5(),fontSize:12}}>✅ {emptyMsg}</div>:
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-        <thead><tr style={{background:"#f8fafc"}}>{["Job / Notes","Project","Assignee","Priority","Due"].map(h=><th key={h} style={{textAlign:"left",padding:"8px 12px",color:"#64748b",fontWeight:700,fontSize:10,textTransform:"uppercase",borderBottom:"1px solid #e8edf5"}}>{h}</th>)}</tr></thead>
+        <thead><tr style={{background:DK.bg2()}}>{["Job / Notes","Project","Assignee","Priority","Due"].map(h=><th key={h} style={{textAlign:"left",padding:"8px 12px",color:DK.txt4(),fontWeight:700,fontSize:10,textTransform:"uppercase",borderBottom:`1px solid ${DK.bdr2()}`}}>{h}</th>)}</tr></thead>
         <tbody>{items.map(j=>{const od=new Date(String(j.due_date).slice(0,10))<now&&j.status!=="done";const proj=projects.find(p=>p.id===j.project_id);
         return <tr key={j.id} style={{borderBottom:"1px solid #f8fafc"}}>
           <td style={{padding:"9px 12px",maxWidth:220}}>
-            <div style={{fontWeight:600,color:"#1e293b"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+            <div style={{fontWeight:600,color:DK.txt2()}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
             {j.notes&&<RenderNotesJSX raw={j.notes} compact/>}
           </td>
-          <td style={{padding:"9px 12px",color:"#64748b",fontSize:11}}>{proj?.name||"—"}</td>
+          <td style={{padding:"9px 12px",color:DK.txt4(),fontSize:11}}>{proj?.name||"—"}</td>
           <td style={{padding:"9px 12px"}}><Avtr user={getUser(j.assignee_id)} size={20} showName/></td>
           <td style={{padding:"9px 12px"}}><PriDot priority={j.priority} lang={lang}/></td>
           <td style={{padding:"9px 12px",color:od?"#dc2626":"#94a3b8",fontSize:11,fontWeight:od?700:400,whiteSpace:"nowrap"}}>{od?"⚠ "+cleanDate(j.due_date):cleanDate(j.due_date)}</td>
@@ -1969,7 +2024,7 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
 
     return <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-        <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>⚠ {lang==="lo"?"ຄວາມສ່ຽງ & ເກີນກໍານົດ":"Risk & Overdue Report"}</div>
+        <div style={{fontSize:15,fontWeight:700,color:DK.txt()}}>⚠ {lang==="lo"?"ຄວາມສ່ຽງ & ເກີນກໍານົດ":"Risk & Overdue Report"}</div>
         <button onClick={printReport} style={{...BS("#dc2626"),padding:"7px 16px",fontSize:13}}>↓ PDF</button>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}}>
@@ -2058,22 +2113,22 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
     return <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
         <div>
-          <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>📊 {lang==="lo"?"ປະສິດທິພາບພະນັກງານ":"Staff Performance"}</div>
-          <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Score = Completion (35%) + On-Time (35%) + No-Overdue (20%) + Progress (10%)</div>
+          <div style={{fontSize:15,fontWeight:700,color:DK.txt()}}>📊 {lang==="lo"?"ປະສິດທິພາບພະນັກງານ":"Staff Performance"}</div>
+          <div style={{fontSize:12,color:DK.txt4(),marginTop:2}}>Score = Completion (35%) + On-Time (35%) + No-Overdue (20%) + Progress (10%)</div>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <select value={fPerfUser} onChange={e=>setFPerfUser(e.target.value)}
-            style={{...SS,minWidth:140,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+            style={{...SS(),minWidth:140,borderRadius:8,border:`1px solid ${DK.bdr()}`,fontSize:12}}>
             <option value="all">{lang==="lo"?"ທຸກຄົນ":"All Staff"}</option>
             {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
           <button onClick={printReport} style={{...BS("#dc2626"),padding:"7px 16px",fontSize:13}}>↓ PDF</button>
         </div>
       </div>
-      {staffPerf.length===0&&<div style={{background:"#fff",borderRadius:12,padding:40,textAlign:"center",color:"#94a3b8"}}>No data for this period.</div>}
+      {staffPerf.length===0&&<div style={{background:DK.bg(),borderRadius:12,padding:40,textAlign:"center",color:DK.txt5()}}>No data for this period.</div>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14,marginBottom:18}}>
         {staffPerf.map((s,idx)=>(
-          <div key={s.u.id} style={{background:"#fff",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderLeft:`4px solid ${scoreColor(s.score)}`}}>
+          <div key={s.u.id} style={{background:DK.bg(),borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderLeft:`4px solid ${scoreColor(s.score)}`}}>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
               <div style={{position:"relative"}}>
                 <Avtr user={s.u} size={42}/>
@@ -2082,8 +2137,8 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
                 {idx===2&&<div style={{position:"absolute",top:-6,right:-6,fontSize:14}}>🥉</div>}
               </div>
               <div style={{flex:1}}>
-                <div style={{fontWeight:700,color:"#0f172a",fontSize:14}}>{s.u.name}</div>
-                <div style={{fontSize:11,color:"#64748b"}}>{s.u.department}</div>
+                <div style={{fontWeight:700,color:DK.txt(),fontSize:14}}>{s.u.name}</div>
+                <div style={{fontSize:11,color:DK.txt4()}}>{s.u.department}</div>
               </div>
               <div style={{textAlign:"center"}}>
                 <div style={{fontSize:28,fontWeight:800,color:scoreColor(s.score),lineHeight:1}}>{s.score}</div>
@@ -2098,10 +2153,10 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
             ].map(m=>(
               <div key={m.lbl} style={{marginBottom:8}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                  <span style={{fontSize:11,color:"#64748b"}}>{m.lbl}</span>
+                  <span style={{fontSize:11,color:DK.txt4()}}>{m.lbl}</span>
                   <span style={{fontSize:11,fontWeight:700,color:m.c}}>{m.val}</span>
                 </div>
-                <div style={{height:4,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+                <div style={{height:4,background:DK.bg3(),borderRadius:99,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${m.p}%`,background:m.c,borderRadius:99,transition:"width 0.5s"}}/>
                 </div>
               </div>
@@ -2110,11 +2165,11 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
           </div>
         ))}
       </div>
-      <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
-        <div style={{padding:"12px 16px",borderBottom:"1px solid #f1f5f9",fontSize:13,fontWeight:700,color:"#0f172a"}}>📋 {lang==="lo"?"ສຸ່ມທຽບ":"Comparison"}</div>
+      <div style={{background:DK.bg(),borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+        <div style={{padding:"12px 16px",borderBottom:`1px solid ${DK.bdr3()}`,fontSize:13,fontWeight:700,color:DK.txt()}}>📋 {lang==="lo"?"ສຸ່ມທຽບ":"Comparison"}</div>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-          <thead><tr style={{background:"#f8fafc"}}>
-            {["Staff","Score","Jobs","Done%","On-Time%","Overdue","Monthly%","Avg%"].map(h=><th key={h} style={{textAlign:"left",padding:"9px 12px",color:"#64748b",fontWeight:700,fontSize:10,textTransform:"uppercase",borderBottom:"1px solid #e8edf5"}}>{h}</th>)}
+          <thead><tr style={{background:DK.bg2()}}>
+            {["Staff","Score","Jobs","Done%","On-Time%","Overdue","Monthly%","Avg%"].map(h=><th key={h} style={{textAlign:"left",padding:"9px 12px",color:DK.txt4(),fontWeight:700,fontSize:10,textTransform:"uppercase",borderBottom:`1px solid ${DK.bdr2()}`}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {staffPerf.map(s=><tr key={s.u.id} style={{borderBottom:"1px solid #f8fafc"}} onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"} onMouseLeave={e=>e.currentTarget.style.background=""}>
@@ -2124,8 +2179,8 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
               <td style={{padding:"9px 12px"}}><span style={{color:s.compRate>=70?"#16a34a":s.compRate>=50?"#f59e0b":"#dc2626",fontWeight:700}}>{s.compRate}%</span></td>
               <td style={{padding:"9px 12px"}}><span style={{color:s.onTimeRate>=80?"#16a34a":s.onTimeRate>=60?"#f59e0b":"#dc2626",fontWeight:700}}>{s.onTimeRate}%</span></td>
               <td style={{padding:"9px 12px",color:s.overdue>0?"#dc2626":"#16a34a",fontWeight:700}}>{s.overdue||"✓"}</td>
-              <td style={{padding:"9px 12px"}}>{s.monthlyRate!==null?<span style={{color:s.monthlyRate>=80?"#16a34a":s.monthlyRate>=50?"#f59e0b":"#dc2626",fontWeight:700}}>{s.monthlyRate}%</span>:<span style={{color:"#94a3b8"}}>—</span>}</td>
-              <td style={{padding:"9px 12px",color:"#64748b"}}>{s.avgPg}%</td>
+              <td style={{padding:"9px 12px"}}>{s.monthlyRate!==null?<span style={{color:s.monthlyRate>=80?"#16a34a":s.monthlyRate>=50?"#f59e0b":"#dc2626",fontWeight:700}}>{s.monthlyRate}%</span>:<span style={{color:DK.txt5()}}>—</span>}</td>
+              <td style={{padding:"9px 12px",color:DK.txt4()}}>{s.avgPg}%</td>
             </tr>)}
           </tbody>
         </table>
@@ -2191,12 +2246,12 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
 
     return <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
-        <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>📂 {lang==="lo"?"ຄວາມຄືບໜ້າໂຄງການ":"Project Progression Report"}
-          <span style={{fontSize:12,color:"#64748b",fontWeight:400,marginLeft:8}}>Active → Planning → Paused → Completed · Notes always shown</span>
+        <div style={{fontSize:15,fontWeight:700,color:DK.txt()}}>📂 {lang==="lo"?"ຄວາມຄືບໜ້າໂຄງການ":"Project Progression Report"}
+          <span style={{fontSize:12,color:DK.txt4(),fontWeight:400,marginLeft:8}}>Active → Planning → Paused → Completed · Notes always shown</span>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           {user.role==="leader"&&<select value={fProjUser} onChange={e=>setFProjUser(e.target.value)}
-            style={{...SS,minWidth:140,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+            style={{...SS(),minWidth:140,borderRadius:8,border:`1px solid ${DK.bdr()}`,fontSize:12}}>
             <option value="all">{lang==="lo"?"ທຸກຄົນ":"All Staff"}</option>
             {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
           </select>}
@@ -2215,30 +2270,30 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
           return (PO[a.priority]||9)-(PO[b.priority]||9);
         });
 
-        return <div key={p.id} style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",marginBottom:16,overflow:"hidden"}}>
+        return <div key={p.id} style={{background:DK.bg(),borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",marginBottom:16,overflow:"hidden"}}>
           {/* Project header */}
           <div style={{padding:"14px 18px",borderLeft:`5px solid ${projColor}`,background:pct2===100?"#f0fdf4":"#fff"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
               <div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <div style={{fontWeight:800,color:"#0f172a",fontSize:15}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div>
+                  <div style={{fontWeight:800,color:DK.txt(),fontSize:15}}>{lang==="lo"&&p.name_lao?p.name_lao:p.name}</div>
                   <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,background:projColor+"18",color:projColor,fontWeight:700,textTransform:"capitalize"}}>{p.status}</span>
                   {pct2===100&&<span style={{fontSize:12}}>✅</span>}
                 </div>
-                {p.description&&<div style={{fontSize:12,color:"#64748b",marginTop:2}}>{p.description}</div>}
+                {p.description&&<div style={{fontSize:12,color:DK.txt4(),marginTop:2}}>{p.description}</div>}
               </div>
               <div style={{display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:22,fontWeight:800,color:projColor}}>{pct2}%</div>
-                  <div style={{fontSize:11,color:"#94a3b8"}}>{done}/{pj.length} {lang==="lo"?"ວຽກ":"jobs"}</div>
+                  <div style={{fontSize:11,color:DK.txt5()}}>{done}/{pj.length} {lang==="lo"?"ວຽກ":"jobs"}</div>
                 </div>
                 <Avtr user={users.find(u=>u.id===p.leader_id)} size={32} showName/>
               </div>
             </div>
-            <div style={{marginTop:10,height:8,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+            <div style={{marginTop:10,height:8,background:DK.bg3(),borderRadius:99,overflow:"hidden"}}>
               <div style={{height:"100%",width:`${pct2}%`,background:pct2===100?"#16a34a":projColor,borderRadius:99,transition:"width 0.6s"}}/>
             </div>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#94a3b8",marginTop:3}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:DK.txt5(),marginTop:3}}>
               <span>{lang==="lo"?"ເລີ່ມ":"Start"} {cleanDate(p.start_date)}</span>
               <span>{lang==="lo"?"ກໍານົດ":"Due"} {cleanDate(p.due_date)}</span>
             </div>
@@ -2262,10 +2317,10 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
                   {/* Progress + meta row */}
                   <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                     <div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <div style={{width:80,height:4,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+                      <div style={{width:80,height:4,background:DK.bg3(),borderRadius:99,overflow:"hidden"}}>
                         <div style={{height:"100%",width:`${pg}%`,background:isDone?"#16a34a":od?"#dc2626":"#3b82f6",borderRadius:99}}/>
                       </div>
-                      <span style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>{pg}%</span>
+                      <span style={{fontSize:11,color:DK.txt5(),fontWeight:600}}>{pg}%</span>
                     </div>
                     <Avtr user={getUser(j.assignee_id)} size={16} showName/>
                     <span style={{fontSize:11,color:od?"#dc2626":"#94a3b8",whiteSpace:"nowrap"}}>{od?"⚠ ":""}{cleanDate(j.due_date)}</span>
@@ -2276,7 +2331,7 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
               </div>
             </div>;
           })}
-          {pj.length===0&&<div style={{padding:"16px 18px",color:"#94a3b8",fontSize:12}}>{lang==="lo"?"ຍັງບໍ່ມີວຽກ":"No jobs yet."}</div>}
+          {pj.length===0&&<div style={{padding:"16px 18px",color:DK.txt5(),fontSize:12}}>{lang==="lo"?"ຍັງບໍ່ມີວຽກ":"No jobs yet."}</div>}
         </div>;
       })}
     </div>;
@@ -2294,7 +2349,7 @@ function ReportsPage({jobs,projects,users,user,getUser,lang}){
 
   return <div style={{animation:"fadeUp 0.3s ease"}}>
     {/* Tab + Period bar */}
-    <div style={{background:"#fff",borderRadius:12,padding:"12px 16px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+    <div style={{background:DK.bg(),borderRadius:12,padding:"12px 16px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
       <div style={{display:"flex",gap:4}}>
         {TABS.map(tb=><button key={tb.id} onClick={()=>setTab(tb.id)}
           style={{padding:"7px 16px",borderRadius:8,border:"none",background:tab===tb.id?"#0f172a":"transparent",color:tab===tb.id?"#fff":"#64748b",fontWeight:tab===tb.id?700:500,fontSize:13,cursor:"pointer",transition:"all 0.15s"}}>
@@ -2347,10 +2402,10 @@ function BoardPage({board,user,users,getUser,onAddNote,onEditNote,onDeleteNote,l
 
   return <div style={{animation:"fadeUp 0.3s ease"}}>
     {/* Header */}
-    <div style={{background:"#fff",borderRadius:12,padding:"13px 18px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+    <div style={{background:DK.bg(),borderRadius:12,padding:"13px 18px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
       <div>
-        <div style={{fontSize:16,fontWeight:700,color:"#0f172a"}}>📌 {lang==="lo"?"ກະດານທີມ":"Team Board"}</div>
-        <div style={{color:"#64748b",fontSize:13,marginTop:1}}>{lang==="lo"?"ແບ່ງປັນຂ່າວ, ແນວຄວາມຄິດ ແລະ ລາຍການດໍາເນີນການ":"Share announcements, ideas and action items with your team"}</div>
+        <div style={{fontSize:16,fontWeight:700,color:DK.txt()}}>📌 {lang==="lo"?"ກະດານທີມ":"Team Board"}</div>
+        <div style={{color:DK.txt4(),fontSize:13,marginTop:1}}>{lang==="lo"?"ແບ່ງປັນຂ່າວ, ແນວຄວາມຄິດ ແລະ ລາຍການດໍາເນີນການ":"Share announcements, ideas and action items with your team"}</div>
       </div>
       <button onClick={()=>setModal({col:COLS[0]})} style={BS("#2563eb")}>+ {lang==="lo"?"ໂພດ":"Post Note"}</button>
     </div>
@@ -2380,10 +2435,10 @@ function BoardPage({board,user,users,getUser,onAddNote,onEditNote,onDeleteNote,l
         const cc=COL_COLORS[col];
         const colNotes=notesByCol[col]||[];
         const colNew=colNotes.filter(n=>String(n.author_id)!==String(user.id)&&!seenIds.includes(String(n.id)));
-        return <div key={col} style={{background:"#f8fafc",borderRadius:12,padding:14,minHeight:180}}>
+        return <div key={col} style={{background:DK.bg2(),borderRadius:12,padding:14,minHeight:180}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{col}</div>
+              <div style={{fontSize:13,fontWeight:700,color:DK.txt()}}>{col}</div>
               {colNew.length>0&&<span style={{background:"#dc2626",color:"#fff",borderRadius:99,fontSize:10,fontWeight:700,padding:"1px 5px",minWidth:16,textAlign:"center"}}>{colNew.length}</span>}
             </div>
             <button onClick={()=>setModal({col})}
@@ -2395,16 +2450,16 @@ function BoardPage({board,user,users,getUser,onAddNote,onEditNote,onDeleteNote,l
             const isPinned=note.pinned==="true"||note.pinned===true;
             const isNew=String(note.author_id)!==String(user.id)&&!seenIds.includes(String(note.id));
             return <div key={note.id}
-              style={{background:"#fff",borderRadius:10,padding:11,marginBottom:8,boxShadow:isNew?"0 0 0 2px "+cc+", 0 2px 6px rgba(0,0,0,0.08)":"0 1px 3px rgba(0,0,0,0.06)",borderLeft:`3px solid ${cc}`,position:"relative",transition:"box-shadow 0.2s"}}
+              style={{background:DK.bg(),borderRadius:10,padding:11,marginBottom:8,boxShadow:isNew?"0 0 0 2px "+cc+", 0 2px 6px rgba(0,0,0,0.08)":"0 1px 3px rgba(0,0,0,0.06)",borderLeft:`3px solid ${cc}`,position:"relative",transition:"box-shadow 0.2s"}}
               onClick={()=>isNew&&markSeen([String(note.id)])}>
               {isPinned&&<div style={{position:"absolute",top:6,right:8,fontSize:11}}>📌</div>}
               {isNew&&<div style={{position:"absolute",top:7,right:isPinned?24:8,width:7,height:7,borderRadius:"50%",background:"#dc2626"}}/>}
-              <div style={{fontSize:13,color:"#1e293b",lineHeight:1.55,fontWeight:note.important==="true"||note.important===true?"700":"400",marginBottom:7,paddingRight:isNew||isPinned?18:0}}>{note.content}</div>
+              <div style={{fontSize:13,color:DK.txt2(),lineHeight:1.55,fontWeight:note.important==="true"||note.important===true?"700":"400",marginBottom:7,paddingRight:isNew||isPinned?18:0}}>{note.content}</div>
               {note.tag&&<span style={{fontSize:10,padding:"1px 7px",borderRadius:99,background:cc+"18",color:cc,fontWeight:700,display:"inline-block",marginBottom:6}}>#{note.tag}</span>}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div style={{display:"flex",alignItems:"center",gap:4}}><Avtr user={au} size={15}/><span style={{fontSize:10,color:"#94a3b8"}}>{au?.name?.split(" ")[0]||"?"} · {cleanDate(note.created_at)}</span></div>
+                <div style={{display:"flex",alignItems:"center",gap:4}}><Avtr user={au} size={15}/><span style={{fontSize:10,color:DK.txt5()}}>{au?.name?.split(" ")[0]||"?"} · {cleanDate(note.created_at)}</span></div>
                 {(user.role==="leader"||String(note.author_id)===String(user.id))&&<div style={{display:"flex",gap:3}}>
-                  <button onClick={e=>{e.stopPropagation();setEditNote(note);}} style={{fontSize:11,color:"#64748b",background:"none",border:"none",padding:"2px 4px",cursor:"pointer"}}>✏</button>
+                  <button onClick={e=>{e.stopPropagation();setEditNote(note);}} style={{fontSize:11,color:DK.txt4(),background:"none",border:"none",padding:"2px 4px",cursor:"pointer"}}>✏</button>
                   <button onClick={e=>{e.stopPropagation();onDeleteNote(note.id);}} style={{fontSize:11,color:"#dc2626",background:"none",border:"none",padding:"2px 4px",cursor:"pointer"}}>✕</button>
                 </div>}
               </div>
@@ -2436,10 +2491,10 @@ function NoteModal({initial,defaultCol,cols,colColors,onClose,onSave,user,lang})
       </div>
     </Lbl>
     <Lbl label={lang==="lo"?"ເນື້ອຫາ":"Content"}>
-      <textarea value={f.content} onChange={e=>set("content",e.target.value)} style={{...IS,height:100,resize:"vertical"}} placeholder={lang==="lo"?"ຂຽນທີ່ນີ້...":"Write your note here..."}/>
+      <textarea value={f.content} onChange={e=>set("content",e.target.value)} style={{...IS(),height:100,resize:"vertical"}} placeholder={lang==="lo"?"ຂຽນທີ່ນີ້...":"Write your note here..."}/>
     </Lbl>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <Lbl label="Tag"><input value={f.tag||""} onChange={e=>set("tag",e.target.value)} style={IS} placeholder="e.g. urgent"/></Lbl>
+      <Lbl label="Tag"><input value={f.tag||""} onChange={e=>set("tag",e.target.value)} style={IS()} placeholder="e.g. urgent"/></Lbl>
       <Lbl label={lang==="lo"?"ຕົວເລືອກ":"Options"}>
         <div style={{display:"flex",gap:12,marginTop:4}}>
           <label style={{display:"flex",alignItems:"center",gap:5,fontSize:13,cursor:"pointer"}}><input type="checkbox" checked={f.pinned===true||f.pinned==="true"} onChange={e=>set("pinned",e.target.checked)} style={{cursor:"pointer"}}/> 📌 Pin</label>
@@ -2457,13 +2512,13 @@ function UserModal({initial,onClose,onSave,saving,lang}){
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   return <Modal title={initial?"Edit User":"Add User"} onClose={onClose} onSave={()=>onSave(f)} saving={saving}>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <Lbl label={t.name}><input value={f.name} onChange={e=>set("name",e.target.value)} style={IS}/></Lbl>
-      <Lbl label={t.nameLao}><input value={f.name_lao||""} onChange={e=>set("name_lao",e.target.value)} style={IS}/></Lbl>
-      <Lbl label={t.email}><input value={f.email} onChange={e=>set("email",e.target.value)} style={IS}/></Lbl>
-      <Lbl label={t.password}><input value={f.password||""} onChange={e=>set("password",e.target.value)} style={IS} placeholder={initial?"Leave blank to keep":""}/></Lbl>
-      <Lbl label={t.role}><select value={f.role} onChange={e=>set("role",e.target.value)} style={IS}><option value="leader">{t.leader}</option><option value="runner">{t.runner}</option></select></Lbl>
-      <Lbl label={t.dept}><input value={f.department||""} onChange={e=>set("department",e.target.value)} style={IS}/></Lbl>
-      <Lbl label="Avatar (2 letters)"><input value={f.avatar||""} onChange={e=>set("avatar",e.target.value.slice(0,2).toUpperCase())} style={IS} maxLength={2}/></Lbl>
+      <Lbl label={t.name}><input value={f.name} onChange={e=>set("name",e.target.value)} style={IS()}/></Lbl>
+      <Lbl label={t.nameLao}><input value={f.name_lao||""} onChange={e=>set("name_lao",e.target.value)} style={IS()}/></Lbl>
+      <Lbl label={t.email}><input value={f.email} onChange={e=>set("email",e.target.value)} style={IS()}/></Lbl>
+      <Lbl label={t.password}><input value={f.password||""} onChange={e=>set("password",e.target.value)} style={IS()} placeholder={initial?"Leave blank to keep":""}/></Lbl>
+      <Lbl label={t.role}><select value={f.role} onChange={e=>set("role",e.target.value)} style={IS()}><option value="leader">{t.leader}</option><option value="runner">{t.runner}</option></select></Lbl>
+      <Lbl label={t.dept}><input value={f.department||""} onChange={e=>set("department",e.target.value)} style={IS()}/></Lbl>
+      <Lbl label="Avatar (2 letters)"><input value={f.avatar||""} onChange={e=>set("avatar",e.target.value.slice(0,2).toUpperCase())} style={IS()} maxLength={2}/></Lbl>
     </div>
   </Modal>;
 }
@@ -2474,15 +2529,15 @@ function ProjectModal({initial,onClose,onSave,users,saving,lang}){
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   return <Modal title={initial?"Edit Project":"New Project"} onClose={onClose} onSave={()=>onSave(f)} saving={saving} wide>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <div style={{gridColumn:"1/-1"}}><Lbl label={t.name+" (EN)"}><input value={f.name} onChange={e=>set("name",e.target.value)} style={IS}/></Lbl></div>
-      <div style={{gridColumn:"1/-1"}}><Lbl label={t.name+" (ລາວ)"}><input value={f.name_lao||""} onChange={e=>set("name_lao",e.target.value)} style={IS}/></Lbl></div>
-      <div style={{gridColumn:"1/-1"}}><Lbl label={t.desc}><textarea value={f.description||""} onChange={e=>set("description",e.target.value)} style={{...IS,height:55}}/></Lbl></div>
-      <Lbl label={t.leader}><select value={f.leader_id} onChange={e=>set("leader_id",e.target.value)} style={IS}>{users.filter(u=>u.role==="leader").map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Lbl>
-      <Lbl label={t.category}><select value={f.category||""} onChange={e=>set("category",e.target.value)} style={IS}><option value="">--</option>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select></Lbl>
-      <Lbl label={t.priority}><select value={f.priority} onChange={e=>set("priority",e.target.value)} style={IS}>{Object.entries(PRIORITY).map(([k,v])=><option key={k} value={k}>{v[lang]||v.en}</option>)}</select></Lbl>
-      <Lbl label={t.status}><select value={f.status} onChange={e=>set("status",e.target.value)} style={IS}><option value="planning">Planning</option><option value="active">Active</option><option value="paused">Paused</option><option value="completed">Completed</option></select></Lbl>
-      <Lbl label={t.startDate}><input type="date" value={f.start_date||""} onChange={e=>set("start_date",e.target.value)} style={IS}/></Lbl>
-      <Lbl label={t.dueDate}><input type="date" value={f.due_date||""} onChange={e=>set("due_date",e.target.value)} style={IS}/></Lbl>
+      <div style={{gridColumn:"1/-1"}}><Lbl label={t.name+" (EN)"}><input value={f.name} onChange={e=>set("name",e.target.value)} style={IS()}/></Lbl></div>
+      <div style={{gridColumn:"1/-1"}}><Lbl label={t.name+" (ລາວ)"}><input value={f.name_lao||""} onChange={e=>set("name_lao",e.target.value)} style={IS()}/></Lbl></div>
+      <div style={{gridColumn:"1/-1"}}><Lbl label={t.desc}><textarea value={f.description||""} onChange={e=>set("description",e.target.value)} style={{...IS(),height:55}}/></Lbl></div>
+      <Lbl label={t.leader}><select value={f.leader_id} onChange={e=>set("leader_id",e.target.value)} style={IS()}>{users.filter(u=>u.role==="leader").map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Lbl>
+      <Lbl label={t.category}><select value={f.category||""} onChange={e=>set("category",e.target.value)} style={IS()}><option value="">--</option>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select></Lbl>
+      <Lbl label={t.priority}><select value={f.priority} onChange={e=>set("priority",e.target.value)} style={IS()}>{Object.entries(PRIORITY).map(([k,v])=><option key={k} value={k}>{v[lang]||v.en}</option>)}</select></Lbl>
+      <Lbl label={t.status}><select value={f.status} onChange={e=>set("status",e.target.value)} style={IS()}><option value="planning">Planning</option><option value="active">Active</option><option value="paused">Paused</option><option value="completed">Completed</option></select></Lbl>
+      <Lbl label={t.startDate}><input type="date" value={f.start_date||""} onChange={e=>set("start_date",e.target.value)} style={IS()}/></Lbl>
+      <Lbl label={t.dueDate}><input type="date" value={f.due_date||""} onChange={e=>set("due_date",e.target.value)} style={IS()}/></Lbl>
     </div>
   </Modal>;
 }
@@ -2610,7 +2665,7 @@ function DueTodayBanner({jobs,user,lang,onOpenJob}){
   const PO2={urgent:0,high:1,medium:2,low:3};
   const sorted=[...dueToday,...overdue].sort((a,b)=>(PO2[a.priority]||9)-(PO2[b.priority]||9)).slice(0,6);
   return (
-    <div style={{position:"fixed",top:16,right:16,zIndex:8888,width:340,background:"#fff",borderRadius:14,boxShadow:"0 8px 32px rgba(0,0,0,0.16)",border:"1px solid #e8edf5",animation:"fadeUp 0.3s ease",overflow:"hidden"}}>
+    <div style={{position:"fixed",top:16,right:16,zIndex:8888,width:340,background:DK.bg(),borderRadius:14,boxShadow:"0 8px 32px rgba(0,0,0,0.16)",border:`1px solid ${DK.bdr2()}`,animation:"fadeUp 0.3s ease",overflow:"hidden"}}>
       {/* Header */}
       <div style={{background:overdue.length?"linear-gradient(135deg,#7f1d1d,#dc2626)":"linear-gradient(135deg,#1e3a5f,#2563eb)",padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div>
@@ -2629,21 +2684,21 @@ function DueTodayBanner({jobs,user,lang,onOpenJob}){
         {sorted.map(j=>{
           const isOd=String(j.due_date).slice(0,10)<todayStr;
           const priC={urgent:"#dc2626",high:"#f97316",medium:"#f59e0b",low:"#94a3b8"};
-          return <div key={j.id} onClick={()=>onOpenJob(j)} style={{padding:"10px 14px",borderBottom:"1px solid #f1f5f9",cursor:"pointer",display:"flex",alignItems:"center",gap:10,transition:"background 0.1s"}}
+          return <div key={j.id} onClick={()=>onOpenJob(j)} style={{padding:"10px 14px",borderBottom:`1px solid ${DK.bdr3()}`,cursor:"pointer",display:"flex",alignItems:"center",gap:10,transition:"background 0.1s"}}
             onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"}
             onMouseLeave={e=>e.currentTarget.style.background=""}>
             <div style={{width:4,height:36,borderRadius:2,background:isOd?"#dc2626":priC[j.priority]||"#94a3b8",flexShrink:0}}/>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontWeight:600,color:"#1e293b",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
+              <div style={{fontWeight:600,color:DK.txt2(),fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
               <div style={{fontSize:10,color:isOd?"#dc2626":"#94a3b8",marginTop:1}}>
                 {isOd?"⚠ Overdue · ":"Due today · "}{cleanDate(j.due_date)} · {Number(j.progress)||0}%
               </div>
             </div>
-            <span style={{fontSize:10,color:"#94a3b8",flexShrink:0}}>→</span>
+            <span style={{fontSize:10,color:DK.txt5(),flexShrink:0}}>→</span>
           </div>;
         })}
       </div>
-      {sorted.length===0&&<div style={{padding:16,textAlign:"center",color:"#94a3b8",fontSize:12}}>✅ All clear!</div>}
+      {sorted.length===0&&<div style={{padding:16,textAlign:"center",color:DK.txt5(),fontSize:12}}>✅ All clear!</div>}
     </div>
   );
 }
@@ -2670,25 +2725,25 @@ function MyWorkPage({jobs,projects,user,getUser,onEdit,onInlineUpdate,lang,savin
     const pg=Number(j.progress)||0;
     const isEx=expandedId===j.id;
     const proj=projects.find(p=>p.id===j.project_id);
-    return <div style={{borderBottom:"1px solid #f1f5f9"}}>
+    return <div style={{borderBottom:`1px solid ${DK.bdr3()}`}}>
       <div onClick={()=>setExpandedId(isEx?null:j.id)}
         style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",cursor:"pointer",background:isEx?"#f0f9ff":"",transition:"background 0.1s"}}
         onMouseEnter={e=>{if(!isEx)e.currentTarget.style.background="#f8fafc";}}
         onMouseLeave={e=>{if(!isEx)e.currentTarget.style.background="";}}>
-        <span style={{fontSize:9,color:"#94a3b8",transform:isEx?"rotate(90deg)":"",transition:"transform 0.2s",flexShrink:0}}>▶</span>
+        <span style={{fontSize:9,color:DK.txt5(),transform:isEx?"rotate(90deg)":"",transition:"transform 0.2s",flexShrink:0}}>▶</span>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontWeight:600,color:j.status==="done"?"#94a3b8":"#1e293b",fontSize:13,textDecoration:j.status==="done"?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
-          <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{proj?.name||""}{j.category?" · "+j.category:""}</div>
+          <div style={{fontSize:10,color:DK.txt5(),marginTop:1}}>{proj?.name||""}{j.category?" · "+j.category:""}</div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
           <div style={{display:"flex",alignItems:"center",gap:3}}>
-            <div style={{width:50,height:4,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":groupColor,borderRadius:99}}/></div>
-            <span style={{fontSize:10,color:"#64748b",fontWeight:600}}>{pg}%</span>
+            <div style={{width:50,height:4,background:DK.bg3(),borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${pg}%`,background:pg===100?"#16a34a":groupColor,borderRadius:99}}/></div>
+            <span style={{fontSize:10,color:DK.txt4(),fontWeight:600}}>{pg}%</span>
           </div>
           <span style={{fontSize:11,color:od?"#dc2626":"#94a3b8",fontWeight:od?700:400,whiteSpace:"nowrap"}}>{od?"⚠ ":""}{cleanDate(j.due_date)}</span>
           <Badge status={j.status} lang={lang}/>
           {user.role==="leader"&&<button onClick={e=>{e.stopPropagation();onEdit(j);}} style={{...BS("#2563eb"),padding:"3px 8px",fontSize:10}}>Edit</button>}
-          <button onClick={e=>{e.stopPropagation();printJobCard(j,projects,getUser,lang);}} title="Print Job Card" style={{width:24,height:24,borderRadius:6,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}>🖨</button>
+          <button onClick={e=>{e.stopPropagation();printJobCard(j,projects,getUser,lang);}} title="Print Job Card" style={{width:24,height:24,borderRadius:6,border:`1px solid ${DK.bdr()}`,background:DK.bg(),cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}>🖨</button>
         </div>
       </div>
       {isEx&&<JobDetailPanel job={j} user={user} getUser={getUser} projects={projects} lang={lang} saving={saving}
@@ -2706,36 +2761,36 @@ function MyWorkPage({jobs,projects,user,getUser,onEdit,onInlineUpdate,lang,savin
         {l:lang==="lo"?"ວັນນີ້":"Today",v:groups[1].jobs.length,c:"#f59e0b"},
         {l:lang==="lo"?"ອາທິດນີ້":"This Week",v:groups[2].jobs.length,c:"#7c3aed"},
         {l:lang==="lo"?"ສໍາເລັດ":"Done",v:done,c:"#16a34a"},
-      ].map(s=><div key={s.l} style={{background:"#fff",borderRadius:12,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`3px solid ${s.c}`,textAlign:"center"}}>
+      ].map(s=><div key={s.l} style={{background:DK.bg(),borderRadius:12,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderTop:`3px solid ${s.c}`,textAlign:"center"}}>
         <div style={{fontSize:24,fontWeight:800,color:s.c}}>{s.v}</div>
-        <div style={{fontSize:11,color:"#94a3b8",fontWeight:600,textTransform:"uppercase",marginTop:2}}>{s.l}</div>
+        <div style={{fontSize:11,color:DK.txt5(),fontWeight:600,textTransform:"uppercase",marginTop:2}}>{s.l}</div>
       </div>)}
     </div>
 
     {/* Progress summary */}
-    <div style={{background:"#fff",borderRadius:12,padding:"12px 18px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",alignItems:"center",gap:14}}>
+    <div style={{background:DK.bg(),borderRadius:12,padding:"12px 18px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",alignItems:"center",gap:14}}>
       <Avtr user={user} size={40}/>
       <div style={{flex:1}}>
-        <div style={{fontWeight:700,color:"#0f172a",fontSize:14}}>{user.name} — {lang==="lo"?"ວຽກຂອງຂ້ອຍ":"My Work"}</div>
+        <div style={{fontWeight:700,color:DK.txt(),fontSize:14}}>{user.name} — {lang==="lo"?"ວຽກຂອງຂ້ອຍ":"My Work"}</div>
         <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
-          <div style={{flex:1,height:8,background:"#f1f5f9",borderRadius:99,overflow:"hidden",maxWidth:240}}>
+          <div style={{flex:1,height:8,background:DK.bg3(),borderRadius:99,overflow:"hidden",maxWidth:240}}>
             <div style={{height:"100%",width:`${total?Math.round(done/total*100):0}%`,background:"#16a34a",borderRadius:99,transition:"width 0.6s"}}/>
           </div>
-          <span style={{fontSize:12,color:"#64748b"}}>{total?Math.round(done/total*100):0}% {lang==="lo"?"ສໍາເລັດ":"complete"} ({done}/{total})</span>
+          <span style={{fontSize:12,color:DK.txt4()}}>{total?Math.round(done/total*100):0}% {lang==="lo"?"ສໍາເລັດ":"complete"} ({done}/{total})</span>
         </div>
       </div>
     </div>
 
     {/* Grouped job lists */}
-    {groups.map(g=>g.jobs.length>0&&<div key={g.id} style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",marginBottom:12,overflow:"hidden"}}>
-      <div style={{padding:"10px 16px",background:g.bg,borderBottom:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    {groups.map(g=>g.jobs.length>0&&<div key={g.id} style={{background:DK.bg(),borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",marginBottom:12,overflow:"hidden"}}>
+      <div style={{padding:"10px 16px",background:g.bg,borderBottom:`1px solid ${DK.bdr3()}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div style={{fontWeight:700,color:g.color,fontSize:13}}>{g.label}</div>
         <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,background:g.color+"18",color:g.color,fontWeight:700}}>{g.jobs.length}</span>
       </div>
       {g.jobs.map(j=><JobRow key={j.id} j={j} groupColor={g.color}/>)}
     </div>)}
 
-    {mine.length===0&&<div style={{background:"#fff",borderRadius:12,padding:40,textAlign:"center",color:"#94a3b8",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+    {mine.length===0&&<div style={{background:DK.bg(),borderRadius:12,padding:40,textAlign:"center",color:DK.txt5(),boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
       ✅ {lang==="lo"?"ບໍ່ມີວຽກທີ່ໄດ້ຮັບມອບໝາຍ":"No jobs assigned to you yet"}
     </div>}
   </div>;
@@ -2767,42 +2822,42 @@ function ActivityLogPage({jobs,users,getUser,lang}){
 
   return <div style={{animation:"fadeUp 0.3s ease"}}>
     {/* Filter bar */}
-    <div style={{background:"#fff",borderRadius:12,padding:"12px 16px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-      <div style={{fontWeight:700,color:"#0f172a",fontSize:14}}>📋 {lang==="lo"?"ປະຫວັດກິດຈະກໍາ":"Activity Log"}</div>
+    <div style={{background:DK.bg(),borderRadius:12,padding:"12px 16px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+      <div style={{fontWeight:700,color:DK.txt(),fontSize:14}}>📋 {lang==="lo"?"ປະຫວັດກິດຈະກໍາ":"Activity Log"}</div>
       <div style={{position:"relative"}}>
-        <span style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",color:"#94a3b8",fontSize:12}}>🔍</span>
+        <span style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",color:DK.txt5(),fontSize:12}}>🔍</span>
         <input value={q} onChange={e=>setQ(e.target.value)} placeholder={lang==="lo"?"ຄົ້ນຫາ...":"Search..."}
-          style={{...SS,paddingLeft:26,minWidth:160,borderRadius:20,background:"#f8fafc",border:"1px solid #e8edf5",fontSize:12}}/>
+          style={{...SS(),paddingLeft:26,minWidth:160,borderRadius:20,background:DK.bg2(),border:`1px solid ${DK.bdr2()}`,fontSize:12}}/>
       </div>
-      <select value={fUser} onChange={e=>setFUser(e.target.value)} style={{...SS,minWidth:130,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+      <select value={fUser} onChange={e=>setFUser(e.target.value)} style={{...SS(),minWidth:130,borderRadius:8,border:`1px solid ${DK.bdr()}`,fontSize:12}}>
         <option value="all">{lang==="lo"?"ທຸກຄົນ":"All Users"}</option>
         {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
       </select>
-      <select value={fAction} onChange={e=>setFAction(e.target.value)} style={{...SS,minWidth:130,borderRadius:8,border:"1px solid #e2e8f0",fontSize:12}}>
+      <select value={fAction} onChange={e=>setFAction(e.target.value)} style={{...SS(),minWidth:130,borderRadius:8,border:`1px solid ${DK.bdr()}`,fontSize:12}}>
         {actionTypes.map(a=><option key={a} value={a}>{a==="all"?"All Actions":a}</option>)}
       </select>
-      <span style={{marginLeft:"auto",fontSize:12,color:"#94a3b8"}}>{filtered.length} {lang==="lo"?"ລາຍການ":"entries"}</span>
+      <span style={{marginLeft:"auto",fontSize:12,color:DK.txt5()}}>{filtered.length} {lang==="lo"?"ລາຍການ":"entries"}</span>
     </div>
 
-    <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
-      {loading&&<div style={{padding:32,textAlign:"center",color:"#94a3b8"}}>⏳ Loading...</div>}
-      {!loading&&filtered.length===0&&<div style={{padding:32,textAlign:"center",color:"#94a3b8"}}>No activity found.</div>}
+    <div style={{background:DK.bg(),borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+      {loading&&<div style={{padding:32,textAlign:"center",color:DK.txt5()}}>⏳ Loading...</div>}
+      {!loading&&filtered.length===0&&<div style={{padding:32,textAlign:"center",color:DK.txt5()}}>No activity found.</div>}
       {!loading&&filtered.map((l,i)=>{
         const u=getUser(l.user_id);
         const ac=actionColor(l.action);
-        return <div key={l.id||i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"11px 16px",borderBottom:"1px solid #f1f5f9",transition:"background 0.1s"}}
+        return <div key={l.id||i} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"11px 16px",borderBottom:`1px solid ${DK.bdr3()}`,transition:"background 0.1s"}}
           onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"}
           onMouseLeave={e=>e.currentTarget.style.background=""}>
           <Avtr user={u} size={30}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{display:"flex",alignItems:"baseline",gap:6,flexWrap:"wrap"}}>
-              <span style={{fontWeight:700,color:"#1e293b",fontSize:12}}>{u?.name||l.user_id||"?"}</span>
+              <span style={{fontWeight:700,color:DK.txt2(),fontSize:12}}>{u?.name||l.user_id||"?"}</span>
               <span style={{fontSize:11,padding:"1px 7px",borderRadius:99,background:ac+"18",color:ac,fontWeight:600}}>{l.action?.replace("job_","").replace("_"," ")}</span>
             </div>
-            <div style={{fontSize:11,color:"#374151",marginTop:2}}><span style={{color:"#64748b"}}>Job: </span>{getJobTitle(l.job_id)}</div>
-            {l.comment&&<div style={{fontSize:11,color:"#64748b",marginTop:2,fontStyle:"italic"}}>{l.comment}</div>}
+            <div style={{fontSize:11,color:DK.txt3(),marginTop:2}}><span style={{color:DK.txt4()}}>Job: </span>{getJobTitle(l.job_id)}</div>
+            {l.comment&&<div style={{fontSize:11,color:DK.txt4(),marginTop:2,fontStyle:"italic"}}>{l.comment}</div>}
           </div>
-          <div style={{fontSize:10,color:"#94a3b8",whiteSpace:"nowrap",flexShrink:0}}>{l.timestamp?.slice(0,16)||""}</div>
+          <div style={{fontSize:10,color:DK.txt5(),whiteSpace:"nowrap",flexShrink:0}}>{l.timestamp?.slice(0,16)||""}</div>
         </div>;
       })}
     </div>
@@ -2926,8 +2981,8 @@ function MonthEndPage({jobs,projects,users,user,getUser,lang,onInlineUpdate,savi
     </div>}
 
     {/* Job checklist */}
-    <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #f1f5f9",fontSize:13,fontWeight:700,color:"#0f172a"}}>
+    <div style={{background:DK.bg(),borderRadius:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+      <div style={{padding:"12px 16px",borderBottom:`1px solid ${DK.bdr3()}`,fontSize:13,fontWeight:700,color:DK.txt()}}>
         {lang==="lo"?"ລາຍການວຽກ":"Task List"} ({total})
       </div>
       {meJobs.sort((a,b)=>(a.status==="done"?1:0)-(b.status==="done"?1:0)||(PO[a.priority]||9)-(PO[b.priority]||9)).map(j=>{
@@ -2935,7 +2990,7 @@ function MonthEndPage({jobs,projects,users,user,getUser,lang,onInlineUpdate,savi
         const pg=Number(j.progress)||0;
         const isDone=j.status==="done";
         const isEx=expandedId===j.id;
-        return <div key={j.id} style={{borderBottom:"1px solid #f1f5f9"}}>
+        return <div key={j.id} style={{borderBottom:`1px solid ${DK.bdr3()}`}}>
           <div onClick={()=>setExpandedId(isEx?null:j.id)}
             style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",cursor:"pointer",background:isDone?"#f9fafb":isEx?"#eff6ff":"",opacity:isDone?0.7:1,transition:"background 0.1s"}}
             onMouseEnter={e=>{if(!isEx&&!isDone)e.currentTarget.style.background="#f8fafc";}}
@@ -2946,16 +3001,16 @@ function MonthEndPage({jobs,projects,users,user,getUser,lang,onInlineUpdate,savi
             </div>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontWeight:600,color:isDone?"#94a3b8":"#1e293b",fontSize:13,textDecoration:isDone?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lang==="lo"&&j.title_lao?j.title_lao:j.title}</div>
-              <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{getUser(j.assignee_id)?.name||"?"} · {j.category}</div>
+              <div style={{fontSize:10,color:DK.txt5(),marginTop:1}}>{getUser(j.assignee_id)?.name||"?"} · {j.category}</div>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
               <div style={{display:"flex",alignItems:"center",gap:3}}>
-                <div style={{width:50,height:4,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${pg}%`,background:isDone?"#16a34a":od?"#dc2626":"#3b82f6",borderRadius:99}}/></div>
-                <span style={{fontSize:10,color:"#64748b",fontWeight:600}}>{pg}%</span>
+                <div style={{width:50,height:4,background:DK.bg3(),borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:`${pg}%`,background:isDone?"#16a34a":od?"#dc2626":"#3b82f6",borderRadius:99}}/></div>
+                <span style={{fontSize:10,color:DK.txt4(),fontWeight:600}}>{pg}%</span>
               </div>
               <Badge status={j.status} lang={lang}/>
               <span style={{fontSize:11,color:od?"#dc2626":"#94a3b8",fontWeight:od?700:400,whiteSpace:"nowrap"}}>{od?"⚠ ":""}{cleanDate(j.due_date)}</span>
-              <button onClick={e=>{e.stopPropagation();printJobCard(j,projects,getUser,lang);}} title="Print Card" style={{width:24,height:24,borderRadius:5,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"}}>🖨</button>
+              <button onClick={e=>{e.stopPropagation();printJobCard(j,projects,getUser,lang);}} title="Print Card" style={{width:24,height:24,borderRadius:5,border:`1px solid ${DK.bdr()}`,background:DK.bg(),cursor:"pointer",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"}}>🖨</button>
             </div>
           </div>
           {isEx&&<JobDetailPanel job={j} user={user} getUser={getUser} projects={projects} lang={lang} saving={saving}
@@ -2963,7 +3018,7 @@ function MonthEndPage({jobs,projects,users,user,getUser,lang,onInlineUpdate,savi
             onClose={()=>setExpandedId(null)}/>}
         </div>;
       })}
-      {meJobs.length===0&&<div style={{padding:40,textAlign:"center",color:"#94a3b8",fontSize:13}}>
+      {meJobs.length===0&&<div style={{padding:40,textAlign:"center",color:DK.txt5(),fontSize:13}}>
         {lang==="lo"?"ບໍ່ມີວຽກສຳລັບເດືອນນີ້":"No jobs found for this month. Check your job due dates or generate monthly jobs."}
       </div>}
     </div>
@@ -3012,6 +3067,13 @@ function App(){
 
   const getUser=id=>users.find(u=>u.id===id)||null;
   const today=()=>new Date().toISOString().split("T")[0];
+
+  // ── THEME (dark mode persisted) — must be before early return ──
+  const [dark,setDark]=useState(()=>localStorage.getItem("fst_theme")==="dark");
+  useEffect(()=>{
+    document.documentElement.setAttribute("data-theme",dark?"dark":"light");window.__fstDark=dark;
+    localStorage.setItem("fst_theme",dark?"dark":"light");
+  },[dark]);
 
   const myJobs=jobs.filter(j=>user?.role==="runner"?j.assignee_id===user.id:true);
   const stats={total:myJobs.length,done:myJobs.filter(j=>j.status==="done").length,inProgress:myJobs.filter(j=>j.status==="in-progress").length,overdue:myJobs.filter(j=>new Date(j.due_date)<new Date()&&j.status!=="done").length};
@@ -3172,70 +3234,192 @@ function App(){
   const getBoardSeen=()=>{try{return JSON.parse(localStorage.getItem(boardSeenKey)||"[]");}catch{return [];}};
   const boardNewCount=board.filter(n=>String(n.author_id)!==String(user?.id||"")&&!getBoardSeen().includes(String(n.id))).length;
 
-  const navItems=[
-    {id:"dashboard",icon:"⬡",en:"Dashboard",lo:"ໜ້າຫຼັກ"},
-    {id:"mywork",icon:"👤",en:"My Work",lo:"ວຽກຂ້ອຍ"},
-    {id:"jobs",icon:"✦",en:"All Jobs",lo:"ວຽກທັງໝົດ"},
-    {id:"projects",icon:"◈",en:"Projects",lo:"ໂຄງການ"},
-    {id:"team",icon:"◉",en:"Team",lo:"ທີມງານ"},
-    {id:"monthly",icon:"📅",en:"Monthly Jobs",lo:"ວຽກປະຈໍາເດືອນ"},
-    {id:"monthend",icon:"🗓",en:"Month-End",lo:"ສະຫຼຸບເດືອນ"},
-    {id:"pending",icon:"📥",en:"Approvals",lo:"ອະນຸມັດ",badge:pendingCount},
-    {id:"timeline",icon:"📊",en:"Timeline",lo:"ເສັ້ນທາງ"},
-    {id:"board",icon:"📌",en:"Team Board",lo:"ກະດານ",badge:boardNewCount},
-    {id:"reports",icon:"📈",en:"Reports",lo:"ລາຍງານ"},
-    {id:"activitylog",icon:"📋",en:"Activity Log",lo:"ປະຫວັດ"},
+  // ── APP LAUNCHER (edit URLs here) ──────────────────────────────
+  const APP_LINKS=[
+    {label:"DMS",        sublabel:"Doc Management System", icon:"📁", color:"#0369a1", url:"//10.0.3.214/fss/fs/FS project/doc_managerment_system-v3/frontend/index_v5.html"},
+    {label:"FIRS Project",sublabel:"FIRS DATA API",  icon:"⚡", color:"#7c3aed", url:"https://sengthavy21-glitch.github.io/FIRS/"},
   ];
 
-  return <div style={{display:"flex",height:"100vh",fontFamily:"'DM Sans','Noto Sans Lao',sans-serif",background:"#f0f2f8",overflow:"hidden"}}>
-    {/* SIDEBAR */}
-    <aside style={{width:218,background:"#0f1729",display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden",position:"relative"}}>
-      <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at top left,#1e3a5f44,transparent 60%),radial-gradient(ellipse at bottom right,#312e8122,transparent 60%)",pointerEvents:"none"}}/>
-      <div style={{padding:"18px 18px 10px",position:"relative",zIndex:1}}>
-        <div style={{fontSize:10,letterSpacing:3,color:"#4a90b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>FS Taskflow</div>
-        <div style={{fontSize:15,fontWeight:800,color:"#fff",lineHeight:1.3}}>"FS Taskflow"</div>
-      </div>
-      <div style={{padding:"0 18px 10px",position:"relative",zIndex:1,display:"flex",gap:5}}>
-        {["en","lo"].map(l=><button key={l} onClick={()=>setLang(l)} style={{flex:1,padding:"4px",borderRadius:5,border:"1px solid rgba(255,255,255,0.1)",background:lang===l?"rgba(59,130,246,0.25)":"transparent",color:lang===l?"#93c5fd":"#475569",fontSize:11,fontWeight:600}}>{l==="en"?"EN":"ລາວ"}</button>)}
-      </div>
-      <div style={{padding:"0 8px",position:"relative",zIndex:1,flex:1,overflowY:"auto"}}>
-        {navItems.map(item=><button key={item.id} onClick={()=>setPage(item.id)} style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"8px 12px",borderRadius:8,border:"none",marginBottom:2,background:page===item.id?"rgba(59,130,246,0.18)":"transparent",color:page===item.id?"#60a5fa":"#94a3b8",fontWeight:page===item.id?600:400,fontSize:13,textAlign:"left",borderLeft:page===item.id?"2px solid #3b82f6":"2px solid transparent",position:"relative"}}>
-          <span style={{fontSize:13}}>{item.icon}</span><span style={{flex:1}}>{item[lang]||item.en}</span>
-          {(item.badge||0)>0&&<span style={{background:"#dc2626",color:"#fff",borderRadius:99,fontSize:10,fontWeight:700,padding:"1px 5px",minWidth:16,textAlign:"center"}}>{item.badge}</span>}
-        </button>)}
-      </div>
-      <div style={{padding:"10px 14px",borderTop:"1px solid #1e2d4a",position:"relative",zIndex:1}}>
-        {<div style={{fontSize:10,color:loading?"#60a5fa":"#f59e0b",marginBottom:6,textAlign:"center",background:loading?"rgba(59,130,246,0.1)":"rgba(245,158,11,0.1)",padding:"3px 8px",borderRadius:4}}>{loading?"⏳ Syncing...":"⚠ Demo Mode"}</div>}
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-          <div style={{width:30,height:30,borderRadius:"50%",background:user.role==="leader"?"linear-gradient(135deg,#3b82f6,#7c3aed)":"linear-gradient(135deg,#06b6d4,#10b981)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{user.avatar||(user.name||"?")[0]}</div>
-          <div><div style={{color:"#e2e8f0",fontSize:12,fontWeight:600}}>{user.name?.split(" ")[0]}</div><div style={{color:"#4a90b8",fontSize:10,textTransform:"uppercase",letterSpacing:0.5}}>{user.role==="leader"?t.leader:t.runner}</div></div>
+  // function to open in new window
+
+
+  const navItems=[
+    {id:"dashboard",  icon:"⬡",  en:"Dashboard",    lo:"ໜ້າຫຼັກ"},
+    {id:"mywork",     icon:"👤", en:"My Work",       lo:"ວຽກຂ້ອຍ"},
+    {id:"jobs",       icon:"✦",  en:"All Jobs",      lo:"ວຽກທັງໝົດ"},
+    {id:"projects",   icon:"◈",  en:"Projects",      lo:"ໂຄງການ"},
+    {id:"team",       icon:"◉",  en:"Team",          lo:"ທີມງານ"},
+    {id:"monthly",    icon:"📅", en:"Monthly Jobs",  lo:"ວຽກປະຈໍາເດືອນ"},
+    {id:"monthend",   icon:"🗓", en:"Month-End",     lo:"ສະຫຼຸບເດືອນ"},
+    {id:"pending",    icon:"📥", en:"Approvals",     lo:"ອະນຸມັດ",badge:pendingCount},
+    {id:"timeline",   icon:"📊", en:"Timeline",      lo:"ເສັ້ນທາງ"},
+    {id:"board",      icon:"📌", en:"Team Board",    lo:"ກະດານ",badge:boardNewCount},
+    {id:"reports",    icon:"📈", en:"Reports",       lo:"ລາຍງານ"},
+    {id:"activitylog",icon:"📋", en:"Activity Log",  lo:"ປະຫວັດ"},
+  ];
+  const NAV_GROUPS=[
+    {label:"",           ids:["dashboard","mywork"]},
+    {label:"Work",       ids:["jobs","projects","team"]},
+    {label:"Schedule",   ids:["monthly","monthend","pending"]},
+    {label:"Insights",   ids:["timeline","board","reports","activitylog"]},
+  ];
+
+  // Dark-aware colour palette
+  const dk=dark;
+  const C={
+    bg:          dk?"#0d1117":"#eef1f8",
+    surface:     dk?"#161b22":"#ffffff",
+    surface2:    dk?"#1c2230":"#f8fafc",
+    surface3:    dk?"#21283a":"#f1f5f9",
+    border:      dk?"#2d3748":"#e2e8f0",
+    border2:     dk?"#374151":"#dde3ed",
+    text:        dk?"#e2e8f0":"#0f172a",
+    text2:       dk?"#cbd5e1":"#374151",
+    text3:       dk?"#94a3b8":"#64748b",
+    text4:       dk?"#64748b":"#94a3b8",
+    sb:          dk?"#080d14":"#0f1729",
+    sbText:      dk?"#5a6a85":"#7a8ba8",
+    sbBorder:    dk?"#1a2235":"#1e2d4a",
+    sbActive:    dk?"rgba(59,130,246,0.25)":"rgba(59,130,246,0.18)",
+    sbActTxt:    "#60a5fa",
+    header:      dk?"#111827":"#ffffff",
+    projBg:      dk?"#141d2b":"#edf1f9",
+    jobHov:      dk?"#1a2235":"#f4f7fc",
+    jobExp:      dk?"#1e2d4a":"#eff6ff",
+    inp:         dk?"#1c2230":"#ffffff",
+    shadow:      dk?"0 1px 6px rgba(0,0,0,0.45)":"0 1px 4px rgba(0,0,0,0.07)",
+  };
+
+  return <div style={{display:"flex",height:"100vh",fontFamily:"'DM Sans','Noto Sans Lao',sans-serif",background:C.bg,overflow:"hidden"}}>
+
+    {/* ══ SIDEBAR ══════════════════════════════════════════════ */}
+    <aside style={{width:220,background:C.sb,display:"flex",flexDirection:"column",flexShrink:0,borderRight:`1px solid ${C.sbBorder}`}}>
+
+      {/* Logo row */}
+      <div style={{padding:"14px 14px 10px",borderBottom:`1px solid ${C.sbBorder}`,flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:10}}>
+          <div style={{width:34,height:34,borderRadius:9,background:"linear-gradient(135deg,#3b82f6,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:"#fff",flexShrink:0,letterSpacing:-0.5}}>FS</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>FS Taskflow</div>
+            <div style={{fontSize:9,color:"#4a7fa8",fontWeight:600,letterSpacing:0.8}}>v9 · FINANCE</div>
+          </div>
+          <button onClick={()=>setDark(d=>!d)} title={dark?"Light":"Dark"}
+            style={{width:26,height:26,borderRadius:6,border:`1px solid ${C.sbBorder}`,background:"transparent",color:C.sbText,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {dark?"☀":"🌙"}
+          </button>
         </div>
-        <div style={{display:"flex",gap:5}}>
-          <button onClick={reload} disabled={loading} style={{flex:1,padding:"5px",borderRadius:6,border:"1px solid #1e2d4a",background:"rgba(59,130,246,0.15)",color:"#60a5fa",fontSize:11}}>{loading?<span className="spin">◌</span>:"↻"} Sync</button>
-          <button onClick={()=>{setUser(null);setUsers([]);setProjects([]);setJobs([]);setBoard([]);}} style={{flex:1,padding:"5px",borderRadius:6,border:"1px solid #1e2d4a",background:"transparent",color:"#64748b",fontSize:11}}>{t.signOut}</button>
+        <div style={{display:"flex",gap:4}}>
+          {["en","lo"].map(l=><button key={l} onClick={()=>setLang(l)}
+            style={{flex:1,padding:"3px 0",borderRadius:5,border:`1px solid ${lang===l?"#3b82f6":C.sbBorder}`,background:lang===l?"rgba(59,130,246,0.22)":"transparent",color:lang===l?"#60a5fa":C.sbText,fontSize:10,fontWeight:700}}>
+            {l==="en"?"EN":"ລາວ"}
+          </button>)}
+        </div>
+      </div>
+
+      {/* Nav groups */}
+      <div style={{flex:1,overflowY:"auto",padding:"6px 8px"}}>
+        {NAV_GROUPS.map((g,gi)=>(
+          <div key={gi} style={{marginBottom:2}}>
+            {g.label&&<div style={{fontSize:9,fontWeight:700,color:C.text4,textTransform:"uppercase",letterSpacing:1.2,padding:"8px 8px 3px",marginTop:gi>0?4:0}}>{g.label}</div>}
+            {g.ids.map(id=>{
+              const item=navItems.find(n=>n.id===id);if(!item)return null;
+              const active=page===id;
+              return <button key={id} onClick={()=>setPage(id)}
+                style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"6px 9px",borderRadius:7,border:"none",marginBottom:1,
+                  background:active?C.sbActive:"transparent",
+                  color:active?C.sbActTxt:C.sbText,
+                  fontWeight:active?700:400,fontSize:12.5,textAlign:"left",
+                  borderLeft:active?"2px solid #3b82f6":"2px solid transparent",
+                  transition:"all 0.12s"}}
+                onMouseEnter={e=>{if(!active){e.currentTarget.style.background=dk?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.04)";e.currentTarget.style.color="#94a3b8";}}}
+                onMouseLeave={e=>{if(!active){e.currentTarget.style.background="transparent";e.currentTarget.style.color=C.sbText;}}}>
+                <span style={{fontSize:12,width:16,textAlign:"center",flexShrink:0,opacity:active?1:0.75}}>{item.icon}</span>
+                <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item[lang]||item.en}</span>
+                {(item.badge||0)>0&&<span style={{background:"#dc2626",color:"#fff",borderRadius:99,fontSize:9,fontWeight:700,padding:"1px 5px",minWidth:15,textAlign:"center"}}>{item.badge}</span>}
+              </button>;
+            })}
+          </div>
+        ))}
+
+        {/* App Launcher */}
+        <div style={{marginTop:6,paddingTop:8,borderTop:`1px solid ${C.sbBorder}`}}>
+          <div style={{fontSize:9,fontWeight:700,color:C.text4,textTransform:"uppercase",letterSpacing:1.2,padding:"3px 8px 5px"}}>🚀 Quick Launch</div>
+          {APP_LINKS.map((app,i)=>(
+            <a
+              key={i}
+              href={app.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display:"flex",alignItems:"center",gap:8,width:"100%",padding:"6px 9px",borderRadius:7,
+                textDecoration:"none",marginBottom:1,color:C.sbText,fontSize:12,
+                background:"transparent",border:"none",cursor:"pointer",transition:"background 0.12s"
+              }}
+              onMouseEnter={e=>{e.currentTarget.style.background=dk?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)";}}
+              onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
+              <div style={{width:24,height:24,borderRadius:6,background:app.color+"20",border:`1px solid ${app.color}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0}}>{app.icon}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:600,color:C.text2,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{app.label}</div>
+                <div style={{fontSize:9,color:C.text4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{app.sublabel}</div>
+              </div>
+              <span style={{fontSize:10,color:C.text4}}>↗</span>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* User footer */}
+      <div style={{padding:"8px 10px",borderTop:`1px solid ${C.sbBorder}`,flexShrink:0}}>
+        {loading&&<div style={{fontSize:9,color:"#60a5fa",marginBottom:5,textAlign:"center",padding:"2px 6px",background:"rgba(59,130,246,0.1)",borderRadius:4}}>⏳ Syncing…</div>}
+        <div style={{display:"flex",alignItems:"center",gap:8,padding:"5px 6px",background:dk?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.03)",borderRadius:7,marginBottom:6}}>
+          <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,
+            background:user.role==="leader"?"linear-gradient(135deg,#3b82f6,#7c3aed)":"linear-gradient(135deg,#06b6d4,#10b981)",
+            display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}}>
+            {user.avatar||(user.name||"?")[0]}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{color:"#e2e8f0",fontSize:11,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.name?.split(" ")[0]}</div>
+            <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:0.6,color:user.role==="leader"?"#818cf8":"#34d399"}}>{user.role==="leader"?t.leader:t.runner}</div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:4}}>
+          <button onClick={reload} disabled={loading}
+            style={{flex:1,padding:"4px",borderRadius:5,border:`1px solid ${C.sbBorder}`,background:"rgba(59,130,246,0.12)",color:"#60a5fa",fontSize:10,fontWeight:600}}>
+            {loading?<span className="spin">◌</span>:"↻"} Sync
+          </button>
+          <button onClick={()=>{setUser(null);setUsers([]);setProjects([]);setJobs([]);setBoard([]);}}
+            style={{flex:1,padding:"4px",borderRadius:5,border:`1px solid ${C.sbBorder}`,background:"transparent",color:C.text3,fontSize:10}}>
+            {t.signOut}
+          </button>
         </div>
       </div>
     </aside>
 
-    {/* MAIN */}
+    {/* ══ MAIN AREA ════════════════════════════════════════════ */}
     <main style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      <div style={{background:"#fff",padding:"11px 22px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid #e8edf5",flexShrink:0}}>
+      {/* Header */}
+      <div style={{background:C.header,padding:"9px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${C.border}`,flexShrink:0,boxShadow:C.shadow}}>
         <div>
-          <div style={{fontSize:17,fontWeight:700,color:"#0f172a"}}>{navItems.find(n=>n.id===page)?.[lang]||navItems.find(n=>n.id===page)?.en}</div>
-          <div style={{fontSize:11,color:"#94a3b8"}}>{new Date().toLocaleDateString(lang==="lo"?"lo-LA":"en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</div>
+          <div style={{fontSize:15,fontWeight:700,color:C.text}}>{navItems.find(n=>n.id===page)?.[lang]||navItems.find(n=>n.id===page)?.en}</div>
+          <div style={{fontSize:10,color:C.text4}}>{new Date().toLocaleDateString(lang==="lo"?"lo-LA":"en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</div>
         </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          {(page==="jobs"||page==="dashboard")&&<><button onClick={exportCSV} style={BS("#059669")}>{t.exportCSV}</button><button onClick={exportPDF} style={BS("#dc2626")}>{t.exportPDF}</button></>}
-          {page==="jobs"&&user.role==="leader"&&<button onClick={()=>setModal({type:"addJob"})} style={BS("#2563eb")}>{t.newJob}</button>}
-          {page==="jobs"&&user.role==="runner"&&<button onClick={()=>setModal({type:"requestJob"})} style={BS("#f59e0b")}>{t.requestJob}</button>}
-          {page==="projects"&&user.role==="leader"&&<button onClick={()=>setModal({type:"addProject"})} style={BS("#7c3aed")}>{t.newProject}</button>}
-          {page==="team"&&user.role==="leader"&&<button onClick={()=>setModal({type:"addUser"})} style={BS("#059669")}>{t.addUser}</button>}
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          {(page==="jobs"||page==="dashboard")&&<>
+            <button onClick={exportCSV} style={{...BS("#059669"),padding:"5px 11px",fontSize:12}}>{t.exportCSV}</button>
+            <button onClick={exportPDF} style={{...BS("#dc2626"),padding:"5px 11px",fontSize:12}}>{t.exportPDF}</button>
+          </>}
+          {page==="jobs"&&user.role==="leader"&&<button onClick={()=>setModal({type:"addJob"})} style={{...BS("#2563eb"),padding:"5px 11px",fontSize:12}}>{t.newJob}</button>}
+          {page==="jobs"&&user.role==="runner"&&<button onClick={()=>setModal({type:"requestJob"})} style={{...BS("#f59e0b"),padding:"5px 11px",fontSize:12}}>{t.requestJob}</button>}
+          {page==="projects"&&user.role==="leader"&&<button onClick={()=>setModal({type:"addProject"})} style={{...BS("#7c3aed"),padding:"5px 11px",fontSize:12}}>{t.newProject}</button>}
+          {page==="team"&&user.role==="leader"&&<button onClick={()=>setModal({type:"addUser"})} style={{...BS("#059669"),padding:"5px 11px",fontSize:12}}>{t.addUser}</button>}
         </div>
       </div>
-      <div style={{flex:1,overflow:"auto",padding:20}}>
+
+      {/* Page */}
+      <div style={{flex:1,overflow:"auto",padding:16}}>
         {page==="dashboard"&&<Dashboard stats={stats} jobs={jobs} projects={projects} user={user} getUser={getUser} onViewJobs={()=>setPage("jobs")} onViewMonthly={()=>setPage("monthly")} onJobClick={j=>setModal({type:"editJob",data:j})} onViewFiltered={(f)=>{if(f.startsWith("proj_")){setFilterProj(f.slice(5));setPage("jobs");}else if(f==="overdue"){setFilterProj(null);setPage("jobs");setDashFilter("overdue");}else if(f==="done"){setFilterProj(null);setPage("jobs");setDashFilter("done");}else if(f==="in-progress"){setFilterProj(null);setPage("jobs");setDashFilter("in-progress");}else{setFilterProj(null);setPage("jobs");}}} lang={lang}/>}
         {page==="mywork"&&<MyWorkPage jobs={jobs} projects={projects} user={user} getUser={getUser} onEdit={j=>setModal({type:"editJob",data:j})} onInlineUpdate={j=>saveJob(j,false)} lang={lang} saving={saving}/>}
-        {page==="jobs"&&<JobsPage allJobs={jobs} filterProj={filterProj} setFilterProj={setFilterProj} dashFilter={dashFilter} clearDashFilter={()=>setDashFilter(null)} projects={projects} users={users} user={user} getUser={getUser} onEdit={j=>setModal({type:"editJob",data:j})} onDelete={deleteJob} onInlineUpdate={j=>saveJob(j,false)} lang={lang} loading={loading} saving={saving}/>}
+        {page==="jobs"&&<JobsPage allJobs={jobs} filterProj={filterProj} setFilterProj={setFilterProj} dashFilter={dashFilter} clearDashFilter={()=>setDashFilter(null)} projects={projects} users={users} user={user} getUser={getUser} onEdit={j=>setModal({type:"editJob",data:j})} onDelete={deleteJob} onInlineUpdate={j=>saveJob(j,false)} lang={lang} loading={loading} saving={saving} dark={dark}/>}
         {page==="projects"&&<ProjectsPage projects={projects} jobs={jobs} user={user} getUser={getUser} onSelectProj={id=>{setFilterProj(id);setPage("jobs");}} onEdit={p=>setModal({type:"editProject",data:p})} onDelete={deleteProject} lang={lang}/>}
         {page==="team"&&<TeamPage users={users} jobs={jobs} user={user} onAddUser={()=>setModal({type:"addUser"})} onEditUser={u=>setModal({type:"editUser",data:u})} onDeleteUser={deleteUser} lang={lang}/>}
         {page==="monthly"&&<MonthlyPage monthly={monthly} jobs={jobs} user={user} users={users} projects={projects} getUser={getUser} onSaveTemplate={saveTemplate} onDeleteTemplate={deleteTemplate} onGenerate={generateMonthly} lang={lang} generating={generating}/>}
@@ -3248,18 +3432,16 @@ function App(){
       </div>
     </main>
 
-    {/* MODALS */}
+    {/* Modals */}
     {(modal?.type==="addJob"||modal?.type==="editJob")&&<JobFormModal initial={modal.data} onClose={()=>setModal(null)} onSave={data=>saveJob(data,!modal.data)} projects={projects} users={users} user={user} lang={lang} saving={saving}/>}
     {modal?.type==="requestJob"&&<JobRequestModal onClose={()=>setModal(null)} onSave={submitRequest} projects={projects} users={users} user={user} lang={lang} saving={saving}/>}
     {(modal?.type==="addProject"||modal?.type==="editProject")&&<ProjectModal initial={modal.data} onClose={()=>setModal(null)} onSave={data=>saveProject(data,!modal.data)} users={users} saving={saving} lang={lang}/>}
     {(modal?.type==="addUser"||modal?.type==="editUser")&&<UserModal initial={modal.data} onClose={()=>setModal(null)} onSave={data=>saveUser(data,!modal.data)} saving={saving} lang={lang}/>}
 
-    {/* DUE TODAY BANNER */}
-    {user&&<DueTodayBanner jobs={jobs} user={user} lang={lang} onOpenJob={j=>{setModal({type:"editJob",data:j});}}/>}
-
-    {notif&&<div style={{position:"fixed",bottom:20,right:20,padding:"11px 18px",borderRadius:10,background:notif.type==="success"?"#16a34a":notif.type==="info"?"#2563eb":"#dc2626",color:"#fff",fontWeight:600,fontSize:13,boxShadow:"0 4px 20px rgba(0,0,0,0.2)",zIndex:9999,animation:"fadeUp 0.3s ease"}}>{notif.msg}</div>}
+    {user&&<DueTodayBanner jobs={jobs} user={user} lang={lang} onOpenJob={j=>setModal({type:"editJob",data:j})}/>}
+    {notif&&<div style={{position:"fixed",bottom:20,right:20,padding:"11px 18px",borderRadius:10,background:notif.type==="success"?"#16a34a":notif.type==="info"?"#2563eb":"#dc2626",color:"#fff",fontWeight:600,fontSize:13,boxShadow:"0 4px 20px rgba(0,0,0,0.25)",zIndex:9999,animation:"fadeUp 0.3s ease"}}>{notif.msg}</div>}
   </div>;
-}
+  }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
