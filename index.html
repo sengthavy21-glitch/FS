@@ -267,7 +267,7 @@ function Login({onLogin,lang,setLang}){
     <div style={{position:"relative",zIndex:1,margin:"auto",width:400,padding:20}}>
       <div style={{textAlign:"center",marginBottom:24}}>
         <div style={{fontSize:11,letterSpacing:4,color:"#3b82f6",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>FS Taskflow v9</div>
-        <div style={{fontSize:28,fontWeight:800,color:"#fff"}}>{lang==="lo"?"ການເງິນ & ບັນຊີ":"Finance & Accounting"}</div>
+        <div style={{fontSize:28,fontWeight:800,color:"#fff"}}>{lang==="lo"?"ການເງິນ & ບັນຊີ":"Financial Statement"}</div>
         <div style={{color:DK.txt4(),fontSize:13,marginTop:5}}>{lang==="lo"?"ເຂົ້າສູ່ລະບົບ":"Sign in to your workspace"}</div>
       </div>
       <div style={{background:"rgba(255,255,255,0.04)",backdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:16,padding:30,boxShadow:"0 25px 60px rgba(0,0,0,0.5)",animation:shake?"shake 0.5s":"fadeUp 0.4s ease"}}>
@@ -836,7 +836,7 @@ function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,p
             {/* JOB ROWS */}
             {!isCollapsed&&<>
               {/* Column headers */}
-              <div style={{display:"grid",gridTemplateColumns:"28px 1fr 120px 100px 100px 76px 72px 88px"+(showHrs?" 78px":"")+" 120px",background:dark?"#111827":"#f5f7fc",borderBottom:`1px solid ${dark?"#1e2d40":"#dde5f0"}`,padding:"0 0"}}>
+              <div style={{display:"grid",gridTemplateColumns:"28px 1fr 120px 100px 100px 76px 72px 88px"+(showHrs?" 78px":"")+" 90px",background:dark?"#111827":"#f5f7fc",borderBottom:`1px solid ${dark?"#1e2d40":"#dde5f0"}`,padding:"0 0"}}>
                 {["","Job","Category","Assignee","Status","Priority","Due","Progress",...(showHrs?["Hours"]:[]),"Actions"].map((h,i)=>(
                   <div key={i} style={{padding:"6px 10px",fontSize:9,fontWeight:700,color:dark?"#4a5a7a":"#8899aa",textTransform:"uppercase",letterSpacing:0.5,overflow:"hidden",whiteSpace:"nowrap"}}>{h}</div>
                 ))}
@@ -849,7 +849,7 @@ function JobsPage({allJobs,filterProj,setFilterProj,dashFilter,clearDashFilter,p
                   <div key={j.id} style={{borderBottom:`1px solid ${dark?"#1a2235":"#edf1f7"}`}}>
                     {/* ROW */}
                     <div onClick={()=>toggleRow(j.id)}
-                      style={{display:"grid",gridTemplateColumns:"28px 1fr 120px 100px 100px 76px 72px 88px"+(showHrs?" 78px":"")+" 120px",alignItems:"center",
+                      style={{display:"grid",gridTemplateColumns:"28px 1fr 120px 100px 100px 76px 72px 88px"+(showHrs?" 78px":"")+" 90px",alignItems:"center",
                         background:isExpanded?(dark?"#1e2d4a":"#eff6ff"):(dark?"#161b22":"#ffffff"),
                         opacity:j.status==="done"?0.6:1,cursor:"pointer",transition:"background 0.1s"}}
                       onMouseEnter={e=>{if(!isExpanded)e.currentTarget.style.background=dark?"#1a2235":"#f4f7fc";}}
@@ -994,6 +994,12 @@ function MonthlyPage({monthly,jobs,user,users,projects,getUser,onSaveTemplate,on
                 {tp.due_offset?` · T+${tp.due_offset}`:""}
               </span>}
             </div>
+            {/* Anchor date status — critical for weekly/biweekly */}
+            {tp.schedule&&tp.schedule!=="monthly"&&<div style={{marginTop:3,fontSize:10,fontWeight:600,display:"flex",alignItems:"center",gap:4}}>
+              {(tp.anchor_date&&String(tp.anchor_date).length>=8)
+                ?<span style={{color:"#059669"}}>📌 Anchor: {cleanDate(tp.anchor_date)}</span>
+                :<span style={{color:"#dc2626"}}>⚠ No anchor date — edit to set it</span>}
+            </div>}
           </div>
           <div style={{display:"flex",gap:5,flexShrink:0,marginLeft:8}}>
             <button onClick={()=>setModal({type:"edit",data:tp})} style={{...BS("#2563eb"),padding:"4px 9px",fontSize:11}}>{t.edit}</button>
@@ -1028,15 +1034,31 @@ function TemplateModal({initial,onClose,onSave,user,users,projects,lang}){
   const DAYS_EN=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const DAYS_LO=["ອາທິດ","ຈັນ","ອັງຄານ","ພຸດ","ພະຫັດ","ສຸກ","ເສົາ"];
 
-  const [f,setF]=useState(initial||{
+  // Merge initial (from sheet) with defaults — ensures all fields present even for old templates
+  const defaults={
     id:"",title:"",title_lao:"",description:"",
     project_id:projects[0]?.id||"",
     default_assignee_id:user.id,owner_id:user.id,
     priority:"high",category:"Month-End Close",estimated_hours:8,active:true,
-    schedule:"monthly",    // monthly | weekly | biweekly | every_n_days
-    schedule_day:4,        // 0-6 for weekday; N for every_n_days interval
-    due_offset:1,          // days after start date = due date
-    anchor_date:"",        // first known occurrence — ensures correct cross-month intervals
+    schedule:"monthly",
+    schedule_day:4,
+    due_offset:10,
+    anchor_date:"",
+  };
+  const [f,setF]=useState(()=>{
+    if(!initial) return defaults;
+    // Merge: spread defaults first so missing fields get default values
+    return {
+      ...defaults,
+      ...initial,
+      // Normalize types from Google Sheets (numbers come as strings or floats)
+      schedule:       initial.schedule||"monthly",
+      schedule_day:   Number(initial.schedule_day)||4,
+      due_offset:     Number(initial.due_offset)||(initial.schedule==="monthly"?10:1),
+      anchor_date:    String(initial.anchor_date||"").slice(0,10), // strip time part if any
+      active:         initial.active===true||initial.active==="true"||initial.active===1||initial.active==="1",
+      estimated_hours:Number(initial.estimated_hours)||8,
+    };
   });
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
@@ -3057,11 +3079,32 @@ function App(){
   const handleLogin=async(u,us,pr,jb,mo,pe,bd)=>{
     setUser(u);setUsers(us);setProjects(pr);setJobs(jb);setMonthly(mo||[]);setPending(pe||[]);setBoard(bd||[]);setPage("dashboard");
     notify(lang==="lo"?"ຍິນດີຕ້ອນຮັບ, ":"Welcome, "+u.name.split(" ")[0]);
-    // Auto-generate monthly if 1st-3rd of month
-    const now=new Date(),day=now.getDate(),m=now.getMonth()+1,y=now.getFullYear();
-    const already=(jb||[]).some(j=>j.id&&j.id.startsWith("mj_")&&j.id.includes(`_${y}_${m}`));
-    if(day<=3&&!already&&(mo||[]).some(tp=>tp.active===true||tp.active==="true"||tp.active===1)){
-      try{const res=await apiPost({action:"generateMonthly"});if(res.success&&res.created>0){notify(`📅 ${res.created} monthly jobs for ${m}/${y}!`);const all=await apiGet({action:"getAll"});if(!all.error){setJobs(all.jobs||[]);setMonthly(all.monthly||[]);}}}catch(e){}
+    // Auto-generate monthly jobs on login if any active templates exist
+    // Check if ANY active template already has jobs this month
+    // For monthly: job id = mj_{id}_y_m (no date suffix)
+    // For weekly/biweekly: job id = mj_{id}_YYYYMMDD (date suffix) — check by prefix+year+month
+    const now=new Date(),m=now.getMonth()+1,y=now.getFullYear();
+    const ym=`${y}${String(m).padStart(2,"0")}`; // e.g. "202604"
+    const activeTemplates=(mo||[]).filter(tp=>tp.active===true||tp.active==="true"||tp.active===1||tp.active==="1");
+    if(activeTemplates.length===0) return;
+    // A template has been generated this month if a job exists with mj_{templateId} prefix
+    // and either _y_m suffix (monthly) or a date suffix in this year+month (weekly/biweekly)
+    const alreadyGenerated=activeTemplates.every(tp=>{
+      const prefix="mj_"+tp.id;
+      return (jb||[]).some(j=>j.id&&j.id.startsWith(prefix)&&(
+        j.id.includes(`_${y}_${m}`) ||                    // monthly format
+        j.id.replace(/-/g,"").includes(ym)                // date-suffix format YYYYMMDD
+      ));
+    });
+    if(!alreadyGenerated){
+      try{
+        const res=await apiPost({action:"generateMonthly"});
+        if(res.success&&res.created>0){
+          notify(`📅 ${res.created} monthly jobs generated for ${m}/${y}!`);
+          const all=await apiGet({action:"getAll"});
+          if(!all.error){setJobs(all.jobs||[]);setMonthly(all.monthly||[]);}
+        }
+      }catch(e){}
     }
   };
 
@@ -3159,7 +3202,22 @@ function App(){
     catch(e){notify("Error","error");}
   };
   const rejectJob=async(id,reason)=>{try{await apiPost({action:"rejectJob",id,reason});setPending(p=>p.map(j=>j.id===id?{...j,approval_status:"rejected",reject_reason:reason}:j));notify("Rejected","info");}catch(e){notify("Error","error");}};
-  const generateMonthly=async()=>{setGenerating(true);try{const res=await apiPost({action:"generateMonthly"});if(res.error)notify("Error: "+res.error,"error");else{notify(`✅ Generated ${res.created} jobs!`);await reload();}}catch(e){notify("Error","error");}setGenerating(false);};
+  const generateMonthly=async()=>{
+    setGenerating(true);
+    try{
+      const res=await apiPost({action:"generateMonthly"});
+      if(res.error){notify("Error: "+res.error,"error");}
+      else{
+        if(res.created>0){
+          notify(`✅ Generated ${res.created} jobs for ${res.month}/${res.year}!`);
+        } else {
+          notify(`ℹ️ ${res.month}/${res.year}: 0 new jobs — all already exist for this period`,"info");
+        }
+        await reload();
+      }
+    }catch(e){notify("Error generating","error");}
+    setGenerating(false);
+  };
 
   // Board CRUD
   const addNote=async(data)=>{
@@ -3237,11 +3295,8 @@ function App(){
   // ── APP LAUNCHER (edit URLs here) ──────────────────────────────
   const APP_LINKS=[
     {label:"DMS",        sublabel:"Doc Management System", icon:"📁", color:"#0369a1", url:"file://///10.0.3.214/fss/fs/FS%20project/doc_managerment_system-v3/frontend/index_v5.html"},
-    {label:"FIRS Project",sublabel:"FIRS DATA API",  icon:"⚡", color:"#7c3aed", url:"https://sengthavy21-glitch.github.io/FIRS/"},
+    {label:"FIRS API",sublabel:"BOL FIRS project",  icon:"⚡", color:"#7c3aed", url:"https://sengthavy21-glitch.github.io/FIRS/"},
   ];
-
-  // function to open in new window
-
 
   const navItems=[
     {id:"dashboard",  icon:"⬡",  en:"Dashboard",    lo:"ໜ້າຫຼັກ"},
@@ -3345,16 +3400,10 @@ function App(){
         <div style={{marginTop:6,paddingTop:8,borderTop:`1px solid ${C.sbBorder}`}}>
           <div style={{fontSize:9,fontWeight:700,color:C.text4,textTransform:"uppercase",letterSpacing:1.2,padding:"3px 8px 5px"}}>🚀 Quick Launch</div>
           {APP_LINKS.map((app,i)=>(
-            <a
-              key={i}
-              href={app.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display:"flex",alignItems:"center",gap:8,width:"100%",padding:"6px 9px",borderRadius:7,
+            <a key={i} href={app.url}
+              style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"6px 9px",borderRadius:7,
                 textDecoration:"none",marginBottom:1,color:C.sbText,fontSize:12,
-                background:"transparent",border:"none",cursor:"pointer",transition:"background 0.12s"
-              }}
+                background:"transparent",border:"none",cursor:"pointer",transition:"background 0.12s"}}
               onMouseEnter={e=>{e.currentTarget.style.background=dk?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)";}}
               onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
               <div style={{width:24,height:24,borderRadius:6,background:app.color+"20",border:`1px solid ${app.color}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0}}>{app.icon}</div>
